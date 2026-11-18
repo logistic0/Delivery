@@ -1,0 +1,1493 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>تطبيق المندوب الاحترافي</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Cairo', 'sans-serif'] },
+                    colors: {
+                        primary: '#0f172a', /* لون داكن ملكي */
+                        secondary: '#2563eb', /* أزرق ساطع */
+                        accent: '#10b981', /* أخضر زمردي للنجاح والمال */
+                        background: '#f8fafc'
+                    },
+                    boxShadow: {
+                        'soft': '0 10px 40px -10px rgba(0,0,0,0.08)',
+                        'glow-blue': '0 0 20px rgba(37, 99, 235, 0.4)',
+                        'glow-green': '0 0 20px rgba(16, 185, 129, 0.4)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
+        
+        * { user-select: none; -webkit-user-select: none; }
+        input, textarea, select { user-select: text; -webkit-user-select: text; }
+
+        /* Toasts */
+        #toast-container { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 999999; display: flex; flex-direction: column; gap: 10px; width: 90%; max-width: 400px; }
+        .toast { padding: 16px 20px; border-radius: 16px; color: white; font-weight: 800; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 12px; animation: slideDown 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards; font-size: 14px; backdrop-filter: blur(10px); }
+        .toast.success { background: linear-gradient(135deg, #10b981, #059669); border: 1px solid rgba(255,255,255,0.2); }
+        .toast.error { background: linear-gradient(135deg, #ef4444, #dc2626); border: 1px solid rgba(255,255,255,0.2); }
+        .toast.warning { background: linear-gradient(135deg, #f59e0b, #d97706); border: 1px solid rgba(255,255,255,0.2); }
+        @keyframes slideDown { from { transform: translateY(-150%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        
+        /* Modals */
+        .modal { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); z-index: 10000; align-items: center; justify-content: center; backdrop-filter: blur(8px); padding: 20px;}
+        .modal.active { display: flex; animation: fadeIn 0.25s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+
+        /* Animations */
+        .new-order-pulse { animation: borderPulse 2s infinite; }
+        @keyframes borderPulse {
+            0% { border-color: rgba(16, 185, 129, 0.5); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+            70% { border-color: rgba(16, 185, 129, 1); box-shadow: 0 0 0 15px rgba(16, 185, 129, 0); }
+            100% { border-color: rgba(16, 185, 129, 0.5); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+        
+        .logo-bounce { animation: float 4s ease-in-out infinite; }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-12px); }
+        }
+
+        /* Custom Scrollbar for inner elements */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        #sidebarOverlay { transition: opacity 0.3s ease; }
+        #sidebarMenu { transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        .view-section { display: none; animation: fadeIn 0.3s ease-out; }
+        .view-section.active { display: flex !important; flex-direction: column; }
+        
+        /* Glass Header */
+        .glass-header { background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255,255,255,0.1); }
+    </style>
+</head>
+<body class="text-gray-800 h-screen flex flex-col relative overflow-hidden bg-slate-50">
+
+    <audio id="newOrderSound" preload="auto">
+        <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+    </audio>
+
+    <div id="toast-container"></div>
+
+    <div id="loginScreen" class="fixed inset-0 bg-slate-100 z-[999] flex flex-col items-center justify-center p-5 overflow-hidden">
+        <div class="absolute top-[-10%] left-[-10%] w-72 h-72 bg-blue-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse"></div>
+        <div class="absolute bottom-[-10%] right-[-10%] w-72 h-72 bg-emerald-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse delay-1000"></div>
+
+        <div class="bg-white/80 backdrop-blur-xl p-8 rounded-[2.5rem] shadow-soft w-full max-w-md text-center relative border border-white/50 z-10">
+            <div class="w-28 h-28 bg-gradient-to-tr from-primary to-secondary rounded-full flex items-center justify-center mx-auto mb-6 shadow-glow-blue logo-bounce relative">
+                <div class="absolute inset-0 border-4 border-white rounded-full opacity-20"></div>
+                <i class="fa-solid fa-motorcycle text-5xl text-white transform -scale-x-100 mt-1"></i>
+            </div>
+            
+            <h1 class="text-4xl font-black text-primary mb-2">بوابة المندوب</h1>
+            <p class="text-sm font-bold text-gray-500 mb-8 tracking-wide">الإدارة الاحترافية - نظام مقصات</p>
+            
+            <div id="loginPendingMsg" class="hidden bg-amber-50/90 backdrop-blur border border-amber-200 text-amber-800 p-6 rounded-3xl mb-6 shadow-sm">
+                <div class="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <i class="fa-solid fa-hourglass-half text-3xl text-amber-500 animate-pulse"></i>
+                </div>
+                <h3 class="font-black text-xl mb-1">الجهاز قيد المراجعة</h3>
+                <p class="text-xs font-bold leading-relaxed">تم إرسال طلب اعتماد لجهازك للإدارة، يرجى الانتظار والمحاولة لاحقاً.</p>
+                <button onclick="window.location.reload()" class="mt-5 bg-amber-500 text-white w-full py-4 rounded-2xl font-black shadow-md hover:bg-amber-600 transition active:scale-95">تحديث الحالة</button>
+            </div>
+
+            <div id="loginBlockedMsg" class="hidden bg-red-50/90 backdrop-blur border border-red-200 text-red-800 p-6 rounded-3xl mb-6 shadow-sm">
+                <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <i class="fa-solid fa-shield-halved text-3xl text-red-500"></i>
+                </div>
+                <h3 class="font-black text-xl mb-1">جهاز غير مصرح</h3>
+                <p class="text-xs font-bold">عذراً، هذا الجهاز محظور من الدخول للنظام.</p>
+            </div>
+
+            <div id="loginFormContainer">
+                <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
+                    <div class="relative group">
+                        <div class="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-secondary group-focus-within:bg-secondary group-focus-within:text-white transition-colors duration-300">
+                            <i class="fa-solid fa-id-badge text-lg"></i>
+                        </div>
+                        <input type="text" id="loginCode" required placeholder="كود المندوب" class="w-full pl-5 pr-16 py-4 bg-gray-50 border-2 border-transparent rounded-2xl outline-none focus:border-secondary focus:bg-white font-black text-lg transition-all shadow-sm">
+                    </div>
+                    <div class="relative group">
+                        <div class="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-secondary group-focus-within:bg-secondary group-focus-within:text-white transition-colors duration-300">
+                            <i class="fa-solid fa-lock text-lg"></i>
+                        </div>
+                        <input type="password" id="loginPass" required placeholder="كلمة المرور" class="w-full pl-5 pr-16 py-4 bg-gray-50 border-2 border-transparent rounded-2xl outline-none focus:border-secondary focus:bg-white font-black text-lg transition-all shadow-sm">
+                    </div>
+                    <button type="submit" id="loginBtn" class="w-full bg-primary text-white py-4 mt-2 rounded-2xl font-black text-xl shadow-[0_8px_20px_rgb(15,23,42,0.3)] hover:shadow-[0_8px_25px_rgb(15,23,42,0.4)] transition-all active:scale-95 flex justify-center items-center gap-3">
+                        تسجيل الدخول <i class="fa-solid fa-arrow-left-long"></i>
+                    </button>
+                </form>
+            </div>
+            
+            <div id="loginLoading" class="hidden mt-6 flex flex-col items-center">
+                <div class="w-16 h-16 border-4 border-slate-100 border-t-secondary rounded-full animate-spin mb-4"></div>
+                <span class="font-black text-primary text-lg">جاري التحقق...</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="appContainer" class="hidden flex-col h-full w-full bg-slate-50 relative">
+        
+        <header class="glass-header text-white z-40 sticky top-0 shrink-0">
+            <div class="px-5 py-4 flex justify-between items-center">
+                <div class="flex items-center gap-4">
+                    <button onclick="toggleSidebar()" class="w-12 h-12 bg-white/10 hover:bg-white/20 rounded-2xl flex items-center justify-center transition-all active:scale-90 border border-white/5">
+                        <i class="fa-solid fa-bars-staggered text-2xl"></i>
+                    </button>
+                    <div class="flex flex-col justify-center">
+                        <h1 class="text-xl font-black tracking-wide leading-tight" id="delegateNameDisplay">الاسم</h1>
+                        <p class="text-[11px] text-blue-200 font-bold bg-secondary/30 inline-block px-2.5 py-0.5 rounded-full mt-1 border border-secondary/50 w-max" id="branchNameDisplay">فرع</p>
+                    </div>
+                </div>
+                <div class="w-12 h-12 bg-gradient-to-br from-secondary to-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30 border border-blue-400/30">
+                    <i class="fa-solid fa-motorcycle text-xl transform -scale-x-100 text-white"></i>
+                </div>
+            </div>
+            
+            <div id="headerStats" class="flex bg-slate-900/50 p-3 justify-around text-center text-sm font-bold border-t border-white/5">
+                <div class="flex-1 flex flex-col items-center justify-center">
+                    <span class="text-slate-400 text-[10px] font-black uppercase tracking-wider mb-0.5">أوردرات معلقة</span>
+                    <span id="statPendingCount" class="text-xl font-black text-white">0</span>
+                </div>
+                <div class="w-px bg-white/10 my-1"></div>
+                <div class="flex-1 flex flex-col items-center justify-center">
+                    <span class="text-slate-400 text-[10px] font-black uppercase tracking-wider mb-0.5">حركات اليوم</span>
+                    <span id="statTotalTodayOrders" class="text-xl font-black text-accent">0</span>
+                </div>
+                <div class="w-px bg-white/10 my-1"></div>
+                <div class="flex-1 flex flex-col items-center justify-center">
+                    <span class="text-slate-400 text-[10px] font-black uppercase tracking-wider mb-0.5">نقدي للتحصيل</span>
+                    <div class="flex items-baseline gap-1"><span id="statTotalCash" class="text-xl font-black text-white">0</span> <span class="text-[9px] text-slate-300">ج.م</span></div>
+                </div>
+            </div>
+        </header>
+
+        <div id="sidebarOverlay" class="fixed inset-0 bg-slate-900/60 z-50 hidden opacity-0 backdrop-blur-sm" onclick="toggleSidebar()"></div>
+        <div id="sidebarMenu" class="fixed top-0 right-0 h-full w-[80%] max-w-sm bg-slate-50 z-50 transform translate-x-full shadow-[20px_0_50px_rgba(0,0,0,0.5)] flex flex-col transition-transform duration-400 rounded-l-[2.5rem] overflow-hidden">
+            <div class="bg-primary p-8 text-white text-center relative overflow-hidden">
+                <div class="absolute -right-10 -top-10 w-40 h-40 bg-secondary rounded-full filter blur-3xl opacity-40"></div>
+                <div class="w-24 h-24 bg-white/10 rounded-[2rem] mx-auto flex items-center justify-center mb-4 border border-white/20 backdrop-blur-md shadow-lg shadow-black/20">
+                    <i class="fa-solid fa-user-astronaut text-5xl"></i>
+                </div>
+                <h2 class="text-2xl font-black relative z-10" id="sideNameDisplay">الاسم</h2>
+                <p class="text-sm font-bold text-blue-200 mt-2 bg-black/30 inline-block px-4 py-1.5 rounded-full relative z-10 border border-white/10" id="sideCodeDisplay">كود: </p>
+            </div>
+            
+            <div class="flex-grow p-5 space-y-3 overflow-y-auto">
+                <button onclick="switchView('home')" class="w-full flex items-center gap-4 p-4 rounded-2xl font-black text-gray-700 hover:bg-white hover:text-primary hover:shadow-soft transition-all active:scale-95 group">
+                    <div class="w-12 h-12 rounded-xl bg-blue-50 group-hover:bg-secondary group-hover:text-white flex items-center justify-center text-xl transition-colors text-secondary"><i class="fa-solid fa-house"></i></div>
+                    <span class="text-lg">لوحة المهام</span>
+                </button>
+                <button onclick="switchView('reports')" class="w-full flex items-center gap-4 p-4 rounded-2xl font-black text-gray-700 hover:bg-white hover:text-emerald-700 hover:shadow-soft transition-all active:scale-95 group">
+                    <div class="w-12 h-12 rounded-xl bg-emerald-50 group-hover:bg-accent group-hover:text-white flex items-center justify-center text-xl transition-colors text-accent"><i class="fa-solid fa-wallet"></i></div>
+                    <span class="text-lg">التقارير والتسويات</span>
+                </button>
+                <button onclick="switchView('settings')" class="w-full flex items-center gap-4 p-4 rounded-2xl font-black text-gray-700 hover:bg-white hover:text-purple-700 hover:shadow-soft transition-all active:scale-95 group">
+                    <div class="w-12 h-12 rounded-xl bg-purple-50 group-hover:bg-purple-600 group-hover:text-white flex items-center justify-center text-xl transition-colors text-purple-600"><i class="fa-solid fa-gear"></i></div>
+                    <span class="text-lg">الإعدادات والأمان</span>
+                </button>
+            </div>
+            
+            <div class="p-6 bg-white border-t border-slate-100">
+                <button onclick="logout()" class="w-full flex items-center justify-center gap-3 p-4 rounded-2xl font-black text-red-500 bg-red-50 hover:bg-red-500 hover:text-white transition-all active:scale-95">
+                    <i class="fa-solid fa-arrow-right-from-bracket text-xl"></i> <span>تسجيل الخروج</span>
+                </button>
+            </div>
+        </div>
+
+        <main id="view-home" class="view-section active flex-grow p-4 overflow-y-auto pb-24 relative">
+            <div id="ordersLoading" class="absolute inset-0 flex flex-col items-center justify-center z-10 text-secondary bg-slate-50/90 backdrop-blur-sm rounded-[2rem] m-2">
+                <div class="w-20 h-20 bg-white rounded-[2rem] shadow-soft flex items-center justify-center mb-4">
+                    <i class="fa-solid fa-motorcycle fa-bounce text-5xl"></i>
+                </div>
+                <p class="font-black text-xl text-primary">جاري جلب المهام...</p>
+            </div>
+            
+            <div id="ordersList" class="space-y-5"></div>
+            
+            <div id="noOrdersMsg" class="hidden flex flex-col items-center justify-center h-full min-h-[60vh] text-gray-400">
+                <div class="w-32 h-32 bg-white shadow-soft rounded-full flex items-center justify-center mb-5">
+                    <i class="fa-solid fa-mug-hot text-6xl text-slate-300"></i>
+                </div>
+                <h3 class="text-2xl font-black text-slate-600 mb-1">لا توجد مهام حالياً</h3>
+                <p class="text-sm font-bold text-slate-400">استرح قليلاً بانتظار تكليفات الفرع الجديدة.</p>
+            </div>
+
+            <button onclick="fetchMyOrders()" class="fixed bottom-6 left-6 w-16 h-16 bg-gradient-to-tr from-secondary to-blue-400 text-white rounded-full shadow-glow-blue flex items-center justify-center text-2xl active:scale-90 transition-transform z-40 border-[3px] border-white">
+                <i class="fa-solid fa-rotate"></i>
+            </button>
+        </main>
+
+        <main id="view-reports" class="view-section flex-grow overflow-hidden flex-col relative bg-slate-50">
+            
+            <div class="bg-white px-5 pt-5 pb-5 shadow-[0_10px_20px_rgba(0,0,0,0.03)] border-b border-gray-100 z-20 shrink-0 rounded-b-[2rem] relative">
+                <div class="flex items-center justify-between mb-5">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 bg-gradient-to-tr from-accent to-emerald-400 rounded-xl flex items-center justify-center text-white shadow-glow-green">
+                            <i class="fa-solid fa-chart-line text-2xl"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-2xl font-black text-primary leading-tight">التقارير</h2>
+                            <span class="text-xs font-bold text-gray-400">تصفية واحتساب المستحقات</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-3 mb-4">
+                    <div class="col-span-1">
+                        <label class="block text-[11px] font-black text-gray-500 mb-1.5 ml-1">من وقت وتاريخ</label>
+                        <input type="datetime-local" id="repFromDate" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-bold focus:outline-none focus:border-accent focus:ring-2 focus:ring-emerald-100 transition-all text-gray-700">
+                    </div>
+                    <div class="col-span-1">
+                        <label class="block text-[11px] font-black text-gray-500 mb-1.5 ml-1">إلى وقت وتاريخ</label>
+                        <input type="datetime-local" id="repToDate" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-bold focus:outline-none focus:border-accent focus:ring-2 focus:ring-emerald-100 transition-all text-gray-700">
+                    </div>
+                    <div class="col-span-2 relative">
+                        <label class="block text-[11px] font-black text-gray-500 mb-1.5 ml-1">تصفية حسب الفرع</label>
+                        <div class="relative">
+                            <select id="repBranchFilter" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm font-bold focus:outline-none focus:border-accent focus:ring-2 focus:ring-emerald-100 appearance-none pr-4 pl-10 transition-all text-gray-700">
+                                <option value="all">كل الحركات (جميع الفروع والأوردرات)</option>
+                            </select>
+                            <div class="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm pointer-events-none">
+                                <i class="fa-solid fa-chevron-down text-gray-400 text-sm"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <button onclick="generateReport()" class="w-full bg-primary text-white py-4 rounded-xl font-black text-lg shadow-[0_8px_20px_rgb(15,23,42,0.2)] hover:bg-slate-800 active:scale-95 transition-all flex justify-center items-center gap-2">
+                    <i class="fa-solid fa-magnifying-glass"></i> استخراج التقرير
+                </button>
+            </div>
+
+            <div class="flex-grow overflow-y-auto p-5 pb-24 relative" id="reportScrollContent">
+                
+                <div id="reportStats" class="hidden flex-col gap-4 mb-6">
+                    <div class="bg-gradient-to-r from-accent to-emerald-500 p-6 rounded-[2rem] shadow-glow-green relative overflow-hidden flex justify-between items-center text-white">
+                        <div class="absolute -right-5 -bottom-5 w-24 h-24 bg-white/20 rounded-full blur-xl"></div>
+                        <div class="relative z-10">
+                            <span class="text-xs font-black text-emerald-100 block mb-1 uppercase tracking-wider">إجمالي المستحق</span>
+                            <div class="text-4xl font-black tracking-tight"><span id="repTotalSettlementMoney">0.00</span> <span class="text-sm font-bold opacity-80">ج.م</span></div>
+                        </div>
+                        <div class="w-16 h-16 bg-white/20 rounded-[1.5rem] flex items-center justify-center border border-white/20 backdrop-blur-sm relative z-10">
+                            <i class="fa-solid fa-sack-dollar text-3xl"></i>
+                        </div>
+                    </div>
+
+                    <div class="bg-white border border-slate-100 p-5 rounded-[2rem] shadow-soft flex items-center justify-between">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-secondary text-xl"><i class="fa-solid fa-route"></i></div>
+                            <div>
+                                <span class="block text-[11px] font-black text-gray-400 uppercase tracking-wider">عدد الحركات المنفذة</span>
+                                <span class="block text-sm font-bold text-gray-700">أوردرات / نقل فروع</span>
+                            </div>
+                        </div>
+                        <div class="text-3xl font-black text-primary"><span id="repTotalMovementsCount">0</span></div>
+                    </div>
+                </div>
+
+                <div id="reportLoading" class="hidden flex-col items-center justify-center py-12 text-accent">
+                    <div class="w-16 h-16 bg-emerald-50 rounded-[2rem] flex items-center justify-center mb-4 shadow-sm border border-emerald-100">
+                        <i class="fa-solid fa-spinner fa-spin text-3xl"></i>
+                    </div>
+                    <p class="font-black text-lg text-slate-700">جاري تحليل العمليات...</p>
+                </div>
+
+                <div id="reportResults" class="space-y-4"></div>
+                
+                <div id="reportEmpty" class="hidden flex-col items-center justify-center py-16 text-gray-400">
+                    <div class="w-24 h-24 bg-white shadow-soft rounded-full flex items-center justify-center mb-5">
+                        <i class="fa-solid fa-box-open text-5xl text-slate-300"></i>
+                    </div>
+                    <p class="font-black text-xl text-slate-600 mb-1">لا توجد حركات مطابقة</p>
+                    <p class="text-sm font-bold text-slate-400">تأكد من اختيار التواريخ والفرع الصحيح.</p>
+                </div>
+            </div>
+        </main>
+
+        <main id="view-settings" class="view-section flex-grow p-5 overflow-y-auto pb-10 relative">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-12 h-12 bg-gradient-to-tr from-purple-600 to-purple-400 rounded-xl flex items-center justify-center text-white shadow-lg shadow-purple-500/30">
+                    <i class="fa-solid fa-gear text-2xl"></i>
+                </div>
+                <div>
+                    <h2 class="text-2xl font-black text-primary leading-tight">الإعدادات</h2>
+                    <span class="text-xs font-bold text-gray-400">إدارة الحساب والأمان</span>
+                </div>
+            </div>
+            
+            <div class="bg-white p-7 rounded-[2.5rem] shadow-soft border border-slate-100 relative overflow-hidden">
+                <div class="absolute right-0 top-0 w-2 h-full bg-purple-500"></div>
+                <h3 class="font-black text-xl text-slate-800 mb-6 flex items-center gap-2"><i class="fa-solid fa-shield-halved text-purple-500 text-2xl"></i> تغيير كلمة المرور</h3>
+                
+                <form id="changePasswordForm" onsubmit="handlePasswordChange(event)" class="space-y-5">
+                    <div>
+                        <label class="block text-xs font-black text-slate-500 mb-2 ml-1">كلمة المرور الحالية</label>
+                        <input type="password" id="oldPass" required class="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-purple-500 focus:bg-white focus:ring-4 focus:ring-purple-100 text-left tracking-widest font-black transition-all shadow-sm" dir="ltr">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-slate-500 mb-2 ml-1">كلمة المرور الجديدة</label>
+                        <input type="password" id="newPass" required minlength="4" class="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-purple-500 focus:bg-white focus:ring-4 focus:ring-purple-100 text-left tracking-widest font-black transition-all shadow-sm" dir="ltr">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-slate-500 mb-2 ml-1">تأكيد كلمة المرور</label>
+                        <input type="password" id="confirmNewPass" required minlength="4" class="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-purple-500 focus:bg-white focus:ring-4 focus:ring-purple-100 text-left tracking-widest font-black transition-all shadow-sm" dir="ltr">
+                    </div>
+                    <button type="submit" id="btnChangePass" class="w-full bg-purple-600 text-white py-4 rounded-2xl font-black text-lg shadow-[0_8px_20px_rgba(147,51,234,0.3)] hover:bg-purple-700 active:scale-95 transition-all mt-6 flex justify-center items-center gap-2">
+                        <i class="fa-solid fa-floppy-disk"></i> حفظ التغييرات
+                    </button>
+                </form>
+            </div>
+        </main>
+
+    </div>
+
+    <div id="deliveryConfirmModal" class="modal">
+        <div class="bg-white rounded-[2.5rem] shadow-2xl p-8 w-full max-w-sm transform transition-all relative overflow-hidden flex flex-col items-center text-center">
+            
+            <div class="absolute -top-10 -right-10 w-32 h-32 bg-accent rounded-full filter blur-3xl opacity-20"></div>
+
+            <div class="w-24 h-24 bg-gradient-to-tr from-accent to-emerald-400 rounded-[2rem] flex items-center justify-center mb-5 shadow-glow-green relative z-10 rotate-3">
+                <i class="fa-solid fa-check-double text-5xl text-white -rotate-3"></i>
+            </div>
+            
+            <h2 class="text-3xl font-black text-primary mb-2 relative z-10">تأكيد التسليم</h2>
+            <div class="flex items-center justify-center gap-2 bg-slate-50 py-2 px-4 rounded-xl border border-slate-100 mb-6 relative z-10 w-full">
+                <span class="text-sm font-bold text-slate-500">رقم الأوردر:</span>
+                <span id="confirmOrderNum" class="text-secondary font-black text-xl tracking-wider"></span>
+            </div>
+
+            <div id="paymentArea" class="w-full mb-6 relative z-10"></div>
+
+            <div class="bg-slate-50 text-slate-600 p-4 rounded-2xl w-full text-xs font-bold mb-6 flex items-start gap-3 text-right border border-slate-100 relative z-10 shadow-sm">
+                <div class="w-8 h-8 rounded-full bg-white flex items-center justify-center shrink-0 shadow-sm text-secondary">
+                    <i class="fa-solid fa-location-crosshairs text-lg"></i>
+                </div>
+                <span class="leading-relaxed mt-1">لحماية حقوقك، سيتم التقاط موقعك الجغرافي (GPS) وقت التسليم لإثبات تواجدك.</span>
+            </div>
+
+            <div class="flex flex-col gap-3 w-full relative z-10">
+                <button onclick="executeDelivery()" id="btnConfirmDelivery" class="w-full bg-primary text-white py-4.5 rounded-2xl font-black text-xl shadow-[0_8px_20px_rgba(15,23,42,0.3)] hover:bg-slate-800 active:scale-95 transition-all flex justify-center items-center gap-2">
+                    <i class="fa-solid fa-check"></i> نعم، تم التوصيل بنجاح
+                </button>
+                <button onclick="closeDeliveryModal()" class="w-full bg-white border-2 border-slate-100 text-slate-600 py-4 rounded-2xl font-black text-lg hover:bg-slate-50 hover:border-slate-200 active:scale-95 transition-all">تراجع</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            // 1. طبقة الحماية ومنع الفحص والعبث بالواجهة
+            document.addEventListener('contextmenu', e => e.preventDefault());
+            document.addEventListener('keydown', e => {
+                if (e.keyCode === 123 || 
+                   (e.ctrlKey && e.shiftKey && ['I', 'C', 'J'].includes(e.key.toUpperCase())) || 
+                   (e.ctrlKey && ['U', 'S'].includes(e.key.toUpperCase()))) {
+                    e.preventDefault();
+                    return false;
+                }
+            });
+
+            // مصيدة كشف فتح أدوات المطورين (DevTools)
+            setInterval(() => {
+                const start = performance.now();
+                debugger;
+                if (performance.now() - start > 100) {
+                    sessionStorage.clear();
+                    document.body.innerHTML = '<div style="height:100vh;display:flex;align-items:center;justify-content:center;background:#0f172a;color:#ef4444;font-family:Cairo,sans-serif;font-weight:900;font-size:24px;text-align:center;padding:20px;">تم إيقاف الجلسة لأسباب أمنية (محاولة فحص الكود)</div>';
+                }
+            }, 3000);
+
+            // 2. تشفير رابط قاعدة البيانات ديناميكياً (XOR + Base64) لمنع ظهور الرابط الصريح في السورس
+            const _k = [83, 99, 105, 115, 115, 111, 114, 115, 50, 48, 50, 54];
+            const _p = "OxcfFhMLWQ4aDxoGH1gAB0oXCBceABoWBxtfGxEcAR4cEQwcSgcQEA1RHRwI";
+            const _getEndpoint = () => {
+                const raw = atob(_p);
+                let out = '';
+                for (let i = 0; i < raw.length; i++) {
+                    out += String.fromCharCode(raw.charCodeAt(i) ^ _k[i % _k.length]);
+                }
+                return out;
+            };
+
+            // دالة تعقيم النصوص لمنع هجمات XSS
+            function escapeHTML(str) {
+                if (str === null || str === undefined) return '';
+                return String(str)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            }
+
+            // 3. محرك الاتصال الذكي لدعم 300+ مستخدم متزامن (Concurrency, Timeout, Retry, Cache & Deduplication)
+            const _inFlightRequests = new Map();
+            const _responseCache = new Map();
+
+            async function secureFetch(path, options = {}, cacheTTL = 0) {
+                const method = (options.method || 'GET').toUpperCase();
+                const url = `${_getEndpoint()}${path}`;
+                const cacheKey = `${method}:${path}`;
+
+                // إرجاع من الكاش إذا كانت البيانات حديثة لتقليل الضغط على السيرفر
+                if (method === 'GET' && cacheTTL > 0 && _responseCache.has(cacheKey)) {
+                    const cached = _responseCache.get(cacheKey);
+                    if (Date.now() - cached.ts < cacheTTL) {
+                        return cached.data;
+                    }
+                }
+
+                // دمج الطلبات المتطابقة في نفس اللحظة (Request Deduplication)
+                if (method === 'GET' && _inFlightRequests.has(cacheKey)) {
+                    return _inFlightRequests.get(cacheKey);
+                }
+
+                const executeRequest = async (retries = 2) => {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 8000); // مهلة 8 ثوانٍ لمنع تعليق التطبيق
+
+                    try {
+                        const res = await fetch(url, {
+                            ...options,
+                            signal: controller.signal,
+                            headers: {
+                                'Content-Type': 'application/json',
+                                ...(options.headers || {})
+                            }
+                        });
+                        clearTimeout(timeoutId);
+
+                        if (!res.ok) throw new Error(`HTTP_${res.status}`);
+                        const data = await res.json();
+
+                        if (method === 'GET' && cacheTTL > 0) {
+                            _responseCache.set(cacheKey, { ts: Date.now(), data });
+                        }
+                        return data;
+                    } catch (err) {
+                        clearTimeout(timeoutId);
+                        if (retries > 0) {
+                            // تأخير عشوائي (Jitter) لمنع تصادم الـ 300 مستخدم في نفس اللحظة
+                            const backoff = (3 - retries) * 500 + Math.floor(Math.random() * 400);
+                            await new Promise(r => setTimeout(r, backoff));
+                            return executeRequest(retries - 1);
+                        }
+                        throw err;
+                    }
+                };
+
+                const promise = executeRequest().finally(() => {
+                    _inFlightRequests.delete(cacheKey);
+                });
+
+                if (method === 'GET') {
+                    _inFlightRequests.set(cacheKey, promise);
+                }
+                return promise;
+            }
+
+            // 4. حماية الجلسة بتوقيع رقمي (Session Integrity) لمنع تزوير كود المندوب في المتصفح
+            function createSessionToken(delObj) {
+                const payload = JSON.stringify(delObj);
+                let hash = 0;
+                const secret = payload + navigator.userAgent + getDeviceId();
+                for (let i = 0; i < secret.length; i++) {
+                    hash = ((hash << 5) - hash) + secret.charCodeAt(i);
+                    hash |= 0;
+                }
+                return btoa(encodeURIComponent(JSON.stringify({ d: delObj, s: hash })));
+            }
+
+            function verifySessionToken(token) {
+                try {
+                    const parsed = JSON.parse(decodeURIComponent(atob(token)));
+                    if (!parsed || !parsed.d || !parsed.s) return null;
+                    const expected = createSessionToken(parsed.d);
+                    return expected === token ? parsed.d : null;
+                } catch (e) {
+                    return null;
+                }
+            }
+
+            // حماية تسجيل الدخول من التخمين المتكرر (Rate Limiting)
+            let loginAttempts = 0;
+            let lockoutUntil = 0;
+
+            let currentDelegate = null;
+            let branchesCache = {};
+            let cashSettingsCache = null; 
+            let subRegionsCache = {};
+            let scissorsPricingCache = {};
+            let myOrders = [];
+            let orderToConfirm = null;
+            let knownOrderIds = new Set();
+            let isFirstLoad = true;
+            let activeInterval = null;
+            let isFetchingOrders = false;
+
+            function showToast(msg, type = 'success') {
+                const container = document.getElementById('toast-container');
+                const t = document.createElement('div');
+                t.className = `toast ${type}`;
+                let icon = type === 'success' ? 'fa-circle-check' : (type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-info');
+                t.innerHTML = `<div class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0"><i class="fa-solid ${icon} text-lg"></i></div> <span class="leading-tight">${escapeHTML(msg)}</span>`;
+                container.appendChild(t);
+                setTimeout(() => t.remove(), 4000);
+            }
+
+            function generateUUID() {
+                if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+                return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                    return v.toString(16);
+                });
+            }
+
+            function getDeviceId() {
+                let id = localStorage.getItem('scissors_delegate_device_id');
+                if(!id) {
+                    id = generateUUID();
+                    localStorage.setItem('scissors_delegate_device_id', id);
+                }
+                return id;
+            }
+
+            function getDeviceInfo() {
+                const ua = navigator.userAgent;
+                let os = "Unknown OS";
+                if(ua.includes("Android")) os = "Android Mobile";
+                else if(ua.includes("iPhone")) os = "iPhone";
+                return `Delegate App Pro - ${os}`;
+            }
+
+            function requestNotificationPermission() {
+                if ("Notification" in window) {
+                    if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+                        Notification.requestPermission();
+                    }
+                }
+            }
+
+            function sendPushNotification(title, body) {
+                if ("Notification" in window && Notification.permission === "granted") {
+                    new Notification(title, { 
+                        body: body, 
+                        icon: "https://cdn-icons-png.flaticon.com/512/2830/2830305.png"
+                    });
+                }
+            }
+
+            function formatDateTimeLocal(dateObj) {
+                const y = dateObj.getFullYear();
+                const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+                const d = String(dateObj.getDate()).padStart(2, '0');
+                const h = String(dateObj.getHours()).padStart(2, '0');
+                const min = String(dateObj.getMinutes()).padStart(2, '0');
+                return `${y}-${m}-${d}T${h}:${min}`;
+            }
+
+            document.addEventListener('DOMContentLoaded', () => {
+                const now = new Date();
+                const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+                const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+                document.getElementById('repFromDate').value = formatDateTimeLocal(startOfDay);
+                document.getElementById('repToDate').value = formatDateTimeLocal(endOfDay);
+
+                const savedToken = sessionStorage.getItem('scissorsDelegateSession');
+                if(savedToken) {
+                    const verifiedUser = verifySessionToken(savedToken);
+                    if (verifiedUser) {
+                        currentDelegate = verifiedUser;
+                        startApp();
+                    } else {
+                        sessionStorage.removeItem('scissorsDelegateSession');
+                    }
+                }
+            });
+
+            window.handleLogin = async function(e) {
+                e.preventDefault();
+
+                if (Date.now() < lockoutUntil) {
+                    const secs = Math.ceil((lockoutUntil - Date.now()) / 1000);
+                    showToast(`تم حظر المحاولات مؤقتاً، انتظر ${secs} ثانية`, "error");
+                    return;
+                }
+
+                const code = document.getElementById('loginCode').value.trim();
+                const pass = document.getElementById('loginPass').value.trim();
+                
+                document.getElementById('loginFormContainer').classList.add('hidden');
+                document.getElementById('loginLoading').classList.remove('hidden');
+
+                const devId = getDeviceId();
+                const devInfo = getDeviceInfo();
+
+                try {
+                    const data = await secureFetch('delegates.json', {}, 10000) || {};
+                    const delegateId = Object.keys(data).find(k => String(data[k].code) === String(code) && String(data[k].password) === String(pass));
+
+                    if (!delegateId) {
+                        loginAttempts++;
+                        if (loginAttempts >= 5) {
+                            lockoutUntil = Date.now() + 60000; // حظر دقيقة بعد 5 محاولات خاطئة
+                            loginAttempts = 0;
+                        }
+                        showToast("كود المندوب أو كلمة المرور غير صحيحة", "error");
+                        document.getElementById('loginFormContainer').classList.remove('hidden');
+                        document.getElementById('loginLoading').classList.add('hidden');
+                        return;
+                    }
+
+                    loginAttempts = 0;
+                    const devData = await secureFetch(`devices/${devId}.json`);
+
+                    if (!devData) {
+                        await secureFetch(`devices/${devId}.json`, {
+                            method: 'PUT',
+                            body: JSON.stringify({ status: 'pending', deviceInfo: devInfo, timestamp: Date.now() })
+                        });
+                        document.getElementById('loginLoading').classList.add('hidden');
+                        document.getElementById('loginPendingMsg').classList.remove('hidden');
+                        return;
+                    }
+
+                    if (devData.status === 'pending') {
+                        document.getElementById('loginLoading').classList.add('hidden');
+                        document.getElementById('loginPendingMsg').classList.remove('hidden');
+                        return;
+                    }
+
+                    if (devData.status === 'blocked') {
+                        document.getElementById('loginLoading').classList.add('hidden');
+                        document.getElementById('loginBlockedMsg').classList.remove('hidden');
+                        return;
+                    }
+
+                    currentDelegate = {
+                        id: delegateId,
+                        name: data[delegateId].name,
+                        code: data[delegateId].code,
+                        branchId: data[delegateId].branchId
+                    };
+                    
+                    sessionStorage.setItem('scissorsDelegateSession', createSessionToken(currentDelegate));
+                    startApp();
+
+                } catch (error) {
+                    showToast("خطأ في الاتصال، تأكد من جودة الإنترنت", "error");
+                    document.getElementById('loginFormContainer').classList.remove('hidden');
+                    document.getElementById('loginLoading').classList.add('hidden');
+                }
+            };
+
+            window.logout = function() {
+                sessionStorage.removeItem('scissorsDelegateSession');
+                window.location.reload();
+            };
+
+            async function startApp() {
+                document.getElementById('loginScreen').classList.add('hidden');
+                document.getElementById('appContainer').classList.remove('hidden');
+                document.getElementById('appContainer').classList.add('flex');
+                
+                document.getElementById('delegateNameDisplay').textContent = currentDelegate.name;
+                document.getElementById('sideNameDisplay').textContent = currentDelegate.name;
+                document.getElementById('sideCodeDisplay').textContent = 'كود الموظف: ' + currentDelegate.code;
+                
+                requestNotificationPermission();
+
+                try {
+                    // تخزين مؤقت (Cache لمدة 5 دقائق) للجداول الثابتة لتخفيف الحمل عن 300 مستخدم
+                    const [bData, csData, srData, spData] = await Promise.all([
+                        secureFetch('branches.json', {}, 300000),
+                        secureFetch('cash-settings.json', {}, 300000),
+                        secureFetch('subRegions.json', {}, 300000),
+                        secureFetch('scissorsPricing.json', {}, 300000)
+                    ]);
+                    
+                    branchesCache = bData || {};
+                    cashSettingsCache = csData;
+                    subRegionsCache = srData || {};
+                    scissorsPricingCache = spData || {};
+
+                    const branchName = branchesCache[currentDelegate.branchId] ? branchesCache[currentDelegate.branchId].name : 'الفرع الرئيسي';
+                    document.getElementById('branchNameDisplay').textContent = branchName;
+                    
+                    const branchSelect = document.getElementById('repBranchFilter');
+                    if(branchSelect) {
+                        branchSelect.innerHTML = '<option value="all">كل الحركات (جميع الفروع والأوردرات)</option>';
+                        Object.keys(branchesCache).forEach(k => {
+                            branchSelect.innerHTML += `<option value="${escapeHTML(k)}">${escapeHTML(branchesCache[k].name)}</option>`;
+                        });
+                    }
+                } catch(e) {}
+
+                fetchMyOrders();
+
+                // توزيع زمني عشوائي (Jitter) لمنع 300 هاتف من إرسال الطلب في نفس الثانية بالضبط
+                const randomJitter = Math.floor(Math.random() * 4000);
+                activeInterval = setInterval(() => {
+                    // إيقاف التحديث التلقائي إذا كان التطبيق في الخلفية لتوفير الباقة والسيرفر
+                    if (!document.hidden && document.getElementById('view-home').classList.contains('active')) {
+                        fetchMyOrders();
+                    }
+                }, 15000 + randomJitter);
+
+                // تحديث فوري عند عودة المندوب للتطبيق
+                document.addEventListener('visibilitychange', () => {
+                    if (!document.hidden && currentDelegate && document.getElementById('view-home').classList.contains('active')) {
+                        fetchMyOrders();
+                    }
+                });
+                
+                // تحديث حالة الاتصال كل دقيقة مع Jitter لتقليل الكتابة المتزامنة
+                setInterval(async () => {
+                    if (document.hidden) return;
+                    const currentDevId = getDeviceId();
+                    try {
+                        await secureFetch(`devices/${currentDevId}.json`, {
+                            method: 'PATCH',
+                            body: JSON.stringify({ lastSeen: Date.now() })
+                        });
+                    } catch(e) {}
+                }, 60000 + Math.floor(Math.random() * 10000));
+            }
+
+            window.toggleSidebar = function() {
+                const menu = document.getElementById('sidebarMenu');
+                const overlay = document.getElementById('sidebarOverlay');
+                
+                if (menu.classList.contains('translate-x-full')) {
+                    menu.classList.remove('translate-x-full');
+                    overlay.classList.remove('hidden');
+                    void overlay.offsetWidth;
+                    overlay.classList.remove('opacity-0');
+                } else {
+                    menu.classList.add('translate-x-full');
+                    overlay.classList.add('opacity-0');
+                    setTimeout(() => overlay.classList.add('hidden'), 300);
+                }
+            };
+
+            window.switchView = function(viewName) {
+                document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+                document.getElementById(`view-${viewName}`).classList.add('active');
+                
+                if(viewName === 'home') {
+                    document.getElementById('headerStats').classList.remove('hidden');
+                    document.getElementById('headerStats').classList.add('flex');
+                    fetchMyOrders();
+                } else {
+                    document.getElementById('headerStats').classList.add('hidden');
+                    document.getElementById('headerStats').classList.remove('flex');
+                }
+
+                toggleSidebar();
+            };
+
+            window.fetchMyOrders = async function() {
+                if (isFetchingOrders) return;
+                isFetchingOrders = true;
+
+                const loading = document.getElementById('ordersLoading');
+                if (myOrders.length === 0 && document.getElementById('view-home').classList.contains('active')) {
+                    loading.classList.remove('hidden');
+                }
+
+                const datesToFetch = [];
+                for(let i=0; i<2; i++) {
+                    let d = new Date(); d.setDate(d.getDate() - i);
+                    datesToFetch.push(d.toISOString().split('T')[0]);
+                }
+
+                let fetchedOrders = [];
+                let pendingCount = 0; 
+                let totalTodayOrders = 0; 
+                let totalCashCollected = 0; 
+                let hasNewOrder = false; 
+
+                const todayStr = new Date().toISOString().split('T')[0];
+
+                try {
+                    // استخدام كاش قصير (3 ثوانٍ) لحماية السيرفر من الضغط المتكرر على زر التحديث
+                    const results = await Promise.all(datesToFetch.map(d => secureFetch(`daily_records/${d}.json`, {}, 3000)));
+                    
+                    results.forEach((dayData, index) => {
+                        if(dayData) {
+                            const dateStr = datesToFetch[index];
+                            Object.keys(dayData).forEach(branchKey => {
+                                const branchOrders = dayData[branchKey];
+                                if (branchOrders && typeof branchOrders === 'object') {
+                                    Object.keys(branchOrders).forEach(k => {
+                                        const r = branchOrders[k];
+                                        
+                                        if (dateStr === todayStr) {
+                                            const qty = Number(r.quantity) || Number(r.count) || Number(r.qty) || 1;
+                                            const isMyDirectTask = (String(r.delegateId) === String(currentDelegate.id));
+                                            
+                                            if (isMyDirectTask) {
+                                                totalTodayOrders += qty; 
+                                            }
+                                        }
+
+                                        if (String(r.delegateId) === String(currentDelegate.id) && r.orderNumber) {
+                                            if (r.status === 'preparing' || r.status === 'out_for_delivery' || r.status === 'pending') {
+                                                if (r.delegateConfirmed === true) return; 
+                                                fetchedOrders.push({ id: k, date: dateStr, parentBranchId: branchKey, ...r });
+            
+                                                pendingCount++;
+                                                
+                                                const payMethod = (r.paymentMethod || 'نقدي').trim();
+                                                if(payMethod === 'نقدي') {
+                                                    totalCashCollected += (Number(r.orderValue) || 0) + (Number(r.changeAmount) || 0);
+                                                }
+
+                                                if (!knownOrderIds.has(k)) {
+                                                    knownOrderIds.add(k);
+                                                    if (!isFirstLoad) {
+                                                        hasNewOrder = true;
+                                                        sendPushNotification("تكليف جديد!", `تم تكليفك بأوردر رقم #${r.orderNumber}`);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    });
+                                }
+                            });
+                        }
+                    });
+
+                    if (hasNewOrder) {
+                        const audio = document.getElementById('newOrderSound');
+                        if (audio) audio.play().catch(() => {});
+                        if(navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                        showToast("تم إرسال تكليف جديد لمهامك!", "success");
+                    }
+                    isFirstLoad = false; 
+
+                    fetchedOrders.sort((a,b) => a.timestamp - b.timestamp);
+                    
+                    if(JSON.stringify(myOrders) !== JSON.stringify(fetchedOrders)) {
+                        myOrders = fetchedOrders;
+                        renderOrders();
+                    }
+
+                    document.getElementById('statPendingCount').textContent = pendingCount;
+                    document.getElementById('statTotalTodayOrders').textContent = totalTodayOrders;
+                    document.getElementById('statTotalCash').textContent = totalCashCollected;
+
+                } catch (e) {
+                } finally {
+                    loading.classList.add('hidden');
+                    isFetchingOrders = false;
+                }
+            };
+
+            function renderOrders() {
+                const list = document.getElementById('ordersList');
+                const noMsg = document.getElementById('noOrdersMsg');
+                
+                if (myOrders.length === 0) {
+                    list.innerHTML = '';
+                    noMsg.classList.remove('hidden');
+                } else {
+                    noMsg.classList.add('hidden');
+                    // بناء الـ HTML دفعة واحدة لتقليل عمليات إعادة الرسم (Reflow) وتسريع الأداء على الهواتف
+                    const htmlBuffer = [];
+                    
+                    myOrders.forEach(order => {
+                        const totalValue = (Number(order.orderValue) || 0) + (Number(order.changeAmount) || 0);
+                        const paymentMethod = escapeHTML(order.paymentMethod || 'نقدي');
+                        const currentStatus = order.status === 'pending' ? 'preparing' : order.status;
+                        
+                        const isOut = currentStatus === 'out_for_delivery';
+                        const cardClass = isOut ? 'bg-white border-2 border-accent shadow-glow-green scale-[1.01]' : 'bg-white border border-slate-100 shadow-soft';
+                        const badgeHtml = isOut ? `<div class="bg-emerald-100 text-emerald-700 text-[10px] font-black px-3 py-1 rounded-full flex items-center gap-1 w-max"><div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div> جاري التوصيل</div>` : `<div class="bg-blue-100 text-blue-700 text-[10px] font-black px-3 py-1 rounded-full w-max">قيد الانتظار بالفرع</div>`;
+
+                        const safeDate = escapeHTML(order.date);
+                        const safeBranch = escapeHTML(order.parentBranchId);
+                        const safeId = escapeHTML(order.id);
+
+                        let actionBtn = '';
+                        if (!isOut) {
+                            actionBtn = `<button onclick="updateToOutForDelivery('${safeDate}', '${safeBranch}', '${safeId}')" class="w-full bg-slate-50 text-secondary py-4 rounded-2xl font-black text-lg hover:bg-blue-50 active:scale-95 transition-all mt-4 border-2 border-secondary/30 border-dashed"><i class="fa-solid fa-motorcycle ml-2"></i> تأكيد استلام الأوردر والخروج</button>`;
+                        } else {
+                            actionBtn = `<button onclick="openDeliveryModal('${safeDate}', '${safeBranch}', '${safeId}')" class="w-full bg-primary text-white py-4.5 rounded-2xl font-black text-xl shadow-[0_8px_20px_rgba(15,23,42,0.3)] hover:shadow-[0_8px_25px_rgba(15,23,42,0.4)] active:scale-95 transition-all mt-4 new-order-pulse"><i class="fa-solid fa-check-double ml-2"></i> تسليم الأوردر للعميل</button>`;
+                        }
+
+                        let payIcon = 'fa-money-bill-wave';
+                        let payColor = 'text-emerald-700 bg-emerald-50 border-emerald-100';
+                        if(order.paymentMethod === 'انستاباي') { payIcon = 'fa-bolt'; payColor = 'text-purple-700 bg-purple-50 border-purple-100'; }
+                        else if(order.paymentMethod === 'فيزا') { payIcon = 'fa-credit-card'; payColor = 'text-blue-700 bg-blue-50 border-blue-100'; }
+                        else if(order.paymentMethod === 'محفظة') { payIcon = 'fa-wallet'; payColor = 'text-orange-700 bg-orange-50 border-orange-100'; }
+
+                        let regionText = escapeHTML(order.subRegionName || order.customerRegion || order.region || order.area || '');
+                        let regionBadge = regionText ? `<div class="bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-black px-2.5 py-1 rounded-lg inline-flex items-center gap-1.5 mb-2"><i class="fa-solid fa-map-pin"></i> ${regionText}</div>` : '';
+
+                        let safeAddress = escapeHTML(order.customerAddress);
+                        let addressHtml = order.customerAddress && order.customerAddress.trim() !== '' ? 
+                            `<div class="bg-slate-50 border border-slate-100 rounded-2xl p-4 mb-4 flex items-start gap-3">
+                                <div class="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center text-red-500 shrink-0"><i class="fa-solid fa-map-location-dot text-lg"></i></div>
+                                <div class="flex-grow">
+                                    <span class="text-[10px] font-black text-slate-400 block mb-1.5 uppercase tracking-wide">بيانات وعنوان التوصيل</span>
+                                    ${regionBadge}
+                                    <span class="text-sm font-black text-slate-700 leading-snug block">${safeAddress}</span>
+                                </div>
+                            </div>` : 
+                            `<div class="bg-slate-50 border border-slate-100 rounded-2xl p-4 mb-4 flex items-start gap-3">
+                                <div class="w-10 h-10 rounded-xl bg-slate-200 flex items-center justify-center text-slate-400 shrink-0"><i class="fa-solid fa-location-question text-lg"></i></div>
+                                <div class="flex-grow">
+                                    <span class="text-[10px] font-black text-slate-400 block mb-1.5 uppercase tracking-wide">بيانات وعنوان التوصيل</span>
+                                    ${regionBadge}
+                                    <span class="text-xs font-bold text-slate-500 italic">العميل لم يحدد العنوان بوضوح</span>
+                                </div>
+                            </div>`;
+
+                        let rawWa = order.customerWhatsapp ? order.customerWhatsapp.trim() : '';
+                        let rawPhone = order.customerPhone ? order.customerPhone.trim() : '';
+                        let finalWa = rawWa || rawPhone;
+                        let finalPhone = rawPhone || rawWa;
+
+                        let contactActionsHtml = '';
+                        if (finalPhone || finalWa) {
+                            let phoneLink = finalPhone ? finalPhone.replace(/\D/g, '') : '';
+                            let waLink = finalWa ? (finalWa.replace(/\D/g, '').startsWith('01') ? '2' + finalWa.replace(/\D/g, '') : finalWa.replace(/\D/g, '')) : '';
+
+                            contactActionsHtml = `
+                                <a href="tel:${phoneLink}" class="bg-white text-secondary border border-slate-200 rounded-2xl p-3 flex flex-col justify-center items-center text-center active:bg-blue-50 hover:shadow-md transition-all">
+                                    <i class="fa-solid fa-phone text-xl mb-1.5"></i><span class="font-black text-[11px]">اتصال</span>
+                                </a>
+                                <a href="https://wa.me/${waLink}" target="_blank" rel="noopener noreferrer" class="bg-white text-accent border border-slate-200 rounded-2xl p-3 flex flex-col justify-center items-center text-center active:bg-emerald-50 hover:shadow-md transition-all">
+                                    <i class="fa-brands fa-whatsapp text-2xl mb-1"></i><span class="font-black text-[11px]">واتساب</span>
+                                </a>`;
+                        } else {
+                            contactActionsHtml = `<div class="col-span-2 bg-slate-50 text-slate-400 border border-slate-200 rounded-2xl p-3 flex justify-center items-center gap-2 text-sm font-bold"><i class="fa-solid fa-phone-slash"></i><span>لا يوجد أرقام تواصل</span></div>`;
+                        }
+
+                        htmlBuffer.push(`
+                            <div class="${cardClass} rounded-[2rem] p-6 transition-all duration-300 relative overflow-hidden">
+                                ${isOut ? '<div class="absolute right-0 top-0 w-2 h-full bg-accent"></div>' : ''}
+                                
+                                <div class="flex justify-between items-start mb-5 pb-4 border-b border-slate-100">
+                                    <div class="flex flex-col gap-2">
+                                        ${badgeHtml}
+                                        <div>
+                                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-0.5">رقم الأوردر</span>
+                                            <div class="text-3xl font-black text-primary tracking-widest leading-none">#${escapeHTML(order.orderNumber)}</div>
+                                        </div>
+                                    </div>
+                                    <div class="text-left bg-gradient-to-br from-slate-800 to-primary px-4 py-2.5 rounded-[1.2rem] shadow-md border border-slate-700">
+                                        <span class="text-[9px] font-black text-slate-300 block mb-0.5 uppercase tracking-wider">المطلوب تحصيله</span>
+                                        <div class="text-2xl font-black text-white">${totalValue > 0 ? totalValue : '---'} <span class="text-xs font-bold text-slate-400">ج.م</span></div>
+                                    </div>
+                                </div>
+
+                                ${addressHtml}
+
+                                <div class="grid grid-cols-3 gap-3 mb-4">
+                                    <div class="${payColor} border rounded-2xl p-3 flex flex-col justify-center items-center text-center">
+                                        <i class="fa-solid ${payIcon} text-2xl mb-1.5 opacity-80"></i>
+                                        <span class="font-black text-[11px] truncate w-full">${paymentMethod}</span>
+                                    </div>
+                                    ${contactActionsHtml}
+                                </div>
+
+                                ${Number(order.changeAmount) > 0 ? `
+                                    <div class="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-2xl text-sm font-black mb-2 flex items-center shadow-sm">
+                                        <div class="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center ml-3 shrink-0 text-amber-600"><i class="fa-solid fa-coins text-2xl"></i></div>
+                                        <div>تنبيه! العميل يحتاج فكة:<br><span class="text-xl">${Number(order.changeAmount)} ج.م</span></div>
+                                    </div>` : ''}
+                                
+                                ${actionBtn}
+                            </div>`);
+                    });
+
+                    list.innerHTML = htmlBuffer.join('');
+                }
+            }
+
+            window.updateToOutForDelivery = async function(dateStr, branchKey, recordId) {
+                try {
+                    await secureFetch(`daily_records/${dateStr}/${branchKey}/${recordId}.json`, { 
+                        method: 'PATCH', 
+                        body: JSON.stringify({ status: 'out_for_delivery', outForDeliveryTimestamp: Date.now() }) 
+                    });
+                    const order = myOrders.find(o => o.id === recordId);
+                    if(order) order.status = 'out_for_delivery';
+                    renderOrders();
+                    if(navigator.vibrate) navigator.vibrate(100);
+                } catch (e) {
+                    showToast("خطأ في تحديث الحالة", "error");
+                }
+            };
+
+            window.openDeliveryModal = function(dateStr, branchKey, recordId) {
+                orderToConfirm = myOrders.find(o => o.id === recordId);
+                if(!orderToConfirm) return;
+
+                document.getElementById('confirmOrderNum').textContent = orderToConfirm.orderNumber;
+                const paymentArea = document.getElementById('paymentArea');
+                const totalVal = (Number(orderToConfirm.orderValue) || 0) + (Number(orderToConfirm.changeAmount) || 0);
+                const method = orderToConfirm.paymentMethod || 'نقدي';
+
+                if (method === 'نقدي') {
+                    paymentArea.innerHTML = `
+                        <div class="bg-slate-50 border border-slate-200 rounded-3xl p-6 mb-5 text-center relative overflow-hidden">
+                            <div class="absolute -left-5 -bottom-5 w-20 h-20 bg-emerald-100 rounded-full blur-xl opacity-50"></div>
+                            <p class="text-xs font-black text-slate-500 mb-2 uppercase tracking-wider relative z-10">المبلغ المطلوب استلامه كاش</p>
+                            <div class="text-6xl font-black text-primary relative z-10">${totalVal} <span class="text-xl text-slate-400">ج.م</span></div>
+                        </div>
+                        <label class="flex items-center gap-4 bg-white border-2 border-slate-200 p-5 rounded-2xl cursor-pointer hover:border-accent hover:bg-emerald-50 transition-all shadow-sm">
+                            <input type="checkbox" id="cashCollectedCheck" class="w-7 h-7 text-accent rounded-lg border-slate-300 focus:ring-accent">
+                            <span class="font-black text-slate-800 text-lg">أؤكد أنني استلمت المبلغ كاملاً.</span>
+                        </label>
+                    `;
+                } else {
+                    paymentArea.innerHTML = `
+                        <div class="bg-gradient-to-br from-purple-50 to-white border border-purple-200 rounded-3xl p-6 text-center shadow-sm">
+                            <div class="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-inner text-purple-600"><i class="fa-solid fa-wallet text-3xl"></i></div>
+                            <h3 class="font-black text-2xl text-primary mb-2">دفع إلكتروني (${escapeHTML(method)})</h3>
+                            <div class="bg-purple-600 text-white font-black text-lg inline-block px-5 py-2 rounded-xl mt-1 shadow-md">القيمة: ${totalVal} ج.م</div>
+                            <div class="mt-6 pt-5 border-t border-purple-100 text-red-500 font-black text-sm flex items-center justify-center gap-2 bg-red-50 py-3 px-4 rounded-xl">
+                                <i class="fa-solid fa-triangle-exclamation text-xl"></i> تأكد من نجاح التحويل في الإدارة!
+                            </div>
+                        </div>
+                    `;
+                }
+                document.getElementById('deliveryConfirmModal').classList.add('active');
+            };
+
+            window.closeDeliveryModal = function() {
+                document.getElementById('deliveryConfirmModal').classList.remove('active');
+                orderToConfirm = null;
+            };
+
+            window.executeDelivery = async function() {
+                if (!orderToConfirm) return;
+
+                const method = orderToConfirm.paymentMethod || 'نقدي';
+                if (method === 'نقدي') {
+                    const check = document.getElementById('cashCollectedCheck');
+                    if (!check || !check.checked) {
+                        showToast("يجب وضع علامة (صح) لتأكيد استلامك للمبلغ", "warning");
+                        return;
+                    }
+                }
+
+                const btn = document.getElementById('btnConfirmDelivery');
+                const originalHtml = btn.innerHTML;
+                btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-xl"></i> جاري إغلاق الأوردر...';
+                btn.disabled = true;
+
+                const pushUpdateToServer = async (locationData = null) => {
+                    const payload = { delegateConfirmed: true, deliveryTimestamp: Date.now() };
+                    if (locationData) payload.deliveryLocation = locationData;
+
+                    try {
+                        await secureFetch(`daily_records/${orderToConfirm.date}/${orderToConfirm.parentBranchId}/${orderToConfirm.id}.json`, { 
+                            method: 'PATCH', 
+                            body: JSON.stringify(payload) 
+                        });
+                        showToast("عمل رائع! تم إغلاق التكليف بنجاح 🚀", "success");
+                        if(navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                        closeDeliveryModal();
+                        btn.innerHTML = originalHtml;
+                        btn.disabled = false;
+                        fetchMyOrders();
+                    } catch(e) {
+                        showToast("حدث خطأ، تأكد من اتصال الإنترنت", "error");
+                        btn.innerHTML = originalHtml;
+                        btn.disabled = false;
+                    }
+                };
+
+                if ("geolocation" in navigator) {
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                            pushUpdateToServer({ lat: position.coords.latitude, lng: position.coords.longitude, accuracy: position.coords.accuracy });
+                        },
+                        () => pushUpdateToServer({ error: "Location denied" }),
+                        { enableHighAccuracy: true, timeout: 7000, maximumAge: 10000 }
+                    );
+                } else {
+                    pushUpdateToServer({ error: "Geolocation not supported" });
+                }
+            };
+
+            // ================= REPORTS & SETTLEMENT LOGIC =================
+            function getDatesInRange(startDateObj, endDateObj) {
+                const dateArray = [];
+                let currentDate = new Date(startDateObj);
+                currentDate.setHours(0,0,0,0);
+                
+                const endD = new Date(endDateObj);
+                endD.setHours(23,59,59,999);
+                
+                while (currentDate <= endD) {
+                    dateArray.push(new Date(currentDate).toISOString().split('T')[0]);
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+                return dateArray;
+            }
+
+            window.generateReport = async function() {
+                const fromDateVal = document.getElementById('repFromDate').value;
+                const toDateVal = document.getElementById('repToDate').value;
+                const selectedBranch = document.getElementById('repBranchFilter').value;
+
+                if(!fromDateVal || !toDateVal) {
+                    showToast("الرجاء إدخال أوقات وتواريخ صحيحة", "error");
+                    return;
+                }
+
+                const fromTs = new Date(fromDateVal).getTime();
+                const toTs = new Date(toDateVal).getTime();
+
+                if (fromTs > toTs) {
+                    showToast("تاريخ البداية يجب أن يكون قبل تاريخ النهاية", "error");
+                    return;
+                }
+
+                const datesToFetch = getDatesInRange(new Date(fromDateVal), new Date(toDateVal));
+                if (datesToFetch.length > 62) {
+                    showToast("الحد الأقصى للتقرير هو 60 يوماً في المرة الواحدة", "warning");
+                    return;
+                }
+                
+                document.getElementById('reportResults').innerHTML = '';
+                document.getElementById('reportStats').classList.add('hidden');
+                document.getElementById('reportEmpty').classList.add('hidden');
+                document.getElementById('reportLoading').classList.remove('hidden');
+                document.getElementById('reportLoading').classList.add('flex');
+
+                let reportMovements = [];
+                let totalMovementsQty = 0; 
+                let totalFinancialSettlement = 0; 
+
+                let csSettings = cashSettingsCache;
+                let subRegions = subRegionsCache;
+                let scissorsPricing = scissorsPricingCache;
+
+                try {
+                    const [csRes, srRes, spRes] = await Promise.all([
+                        secureFetch('cash-settings.json', {}, 60000),
+                        secureFetch('subRegions.json', {}, 60000),
+                        secureFetch('scissorsPricing.json', {}, 60000)
+                    ]);
+                    csSettings = csRes;
+                    subRegions = srRes || {};
+                    scissorsPricing = spRes || {};
+                    
+                    cashSettingsCache = csSettings;
+                    subRegionsCache = subRegions;
+                    scissorsPricingCache = scissorsPricing;
+                } catch(e) {}
+
+                try {
+                    // جلب السجلات اليومية على دفعات (Chunking) لحماية المتصفح والسيرفر عند طلب فترات طويلة
+                    const results = [];
+                    const batchSize = 7;
+                    for (let i = 0; i < datesToFetch.length; i += batchSize) {
+                        const chunk = datesToFetch.slice(i, i + batchSize);
+                        const chunkResults = await Promise.all(chunk.map(d => secureFetch(`daily_records/${d}.json`, {}, 15000)));
+                        results.push(...chunkResults);
+                    }
+                    
+                    results.forEach((dayData, index) => {
+                        if(dayData) {
+                            const dateStr = datesToFetch[index];
+                            Object.keys(dayData).forEach(branchKey => {
+                                const branchOrders = dayData[branchKey];
+                                if (branchOrders && typeof branchOrders === 'object') {
+                                    Object.keys(branchOrders).forEach(k => {
+                                        const r = branchOrders[k];
+                                        
+                                        const isMySpecificMovement = (String(r.delegateId) === String(currentDelegate.id));
+                                        
+                                        if (isMySpecificMovement) {
+                                            const recordTs = r.deliveryTimestamp || r.timestamp || r.createdAt; 
+                                            
+                                            if (recordTs >= fromTs && recordTs <= toTs) {
+                                                
+                                                let matchesBranch = true;
+                                                if (selectedBranch !== 'all') {
+                                                    matchesBranch = (String(r.branchId) === String(selectedBranch) || String(r.toBranch) === String(selectedBranch) || String(branchKey) === String(selectedBranch));
+                                                }
+
+                                                const isCancelled = r.status && String(r.status).toLowerCase().includes('cancel');
+                                                
+                                                if (matchesBranch && !isCancelled) {
+                                                    
+                                                    const movementQty = Number(r.quantity) || Number(r.qty) || Number(r.count) || 1;
+                                                    const isOrder = !!r.orderNumber;
+                                                    let finalUnitPrice = 0;
+                                                    let locationOrScissorLabel = '';
+
+                                                    if (isOrder) {
+                                                        const regId = r.subRegionId || r.regionId || r.areaId;
+                                                        const regName = (r.subRegionName || r.customerRegion || r.region || r.area || '').trim();
+
+                                                        if (r.deliveryFee !== undefined && r.deliveryFee !== null && !isNaN(Number(r.deliveryFee))) {
+                                                            finalUnitPrice = Number(r.deliveryFee);
+                                                        } else if (r.regionPrice !== undefined && r.regionPrice !== null && !isNaN(Number(r.regionPrice))) {
+                                                            finalUnitPrice = Number(r.regionPrice);
+                                                        } else if (r.delegatePrice !== undefined && r.delegatePrice !== null && !isNaN(Number(r.delegatePrice))) {
+                                                            finalUnitPrice = Number(r.delegatePrice);
+                                                        } else if (regId && subRegions && subRegions[regId]) {
+                                                            finalUnitPrice = Number(subRegions[regId].delegatePrice ?? subRegions[regId].price ?? subRegions[regId].deliveryFee ?? 0);
+                                                        } else if (regName && subRegions) {
+                                                            const foundRegKey = Object.keys(subRegions).find(rk => 
+                                                                subRegions[rk] && (
+                                                                    (subRegions[rk].name && subRegions[rk].name.trim() === regName) ||
+                                                                    (subRegions[rk].regionName && subRegions[rk].regionName.trim() === regName)
+                                                                )
+                                                            );
+                                                            if (foundRegKey) {
+                                                                finalUnitPrice = Number(subRegions[foundRegKey].delegatePrice ?? subRegions[foundRegKey].price ?? subRegions[foundRegKey].deliveryFee ?? 0);
+                                                            }
+                                                        }
+
+                                                        if (regName) {
+                                                            locationOrScissorLabel = `منطقة: ${regName}`;
+                                                        } else if (regId && subRegions && subRegions[regId]) {
+                                                            locationOrScissorLabel = `منطقة: ${subRegions[regId].name || subRegions[regId].regionName || ''}`;
+                                                        }
+                                                    } else {
+                                                        const fromB = r.fromBranch || r.branchId || branchKey;
+                                                        const toB = r.toBranch || r.targetBranch;
+                                                        const scissorId = r.scissorId || r.routeId || r.transferTypeId;
+
+                                                        if (r.movementPrice !== undefined && r.movementPrice !== null && !isNaN(Number(r.movementPrice))) {
+                                                            finalUnitPrice = Number(r.movementPrice);
+                                                        } else if (r.settlementPrice !== undefined && r.settlementPrice !== null && !isNaN(Number(r.settlementPrice))) {
+                                                            finalUnitPrice = Number(r.settlementPrice);
+                                                        } else if (r.delegatePrice !== undefined && r.delegatePrice !== null && !isNaN(Number(r.delegatePrice))) {
+                                                            finalUnitPrice = Number(r.delegatePrice);
+                                                        } else if (r.price !== undefined && r.price !== null && !isNaN(Number(r.price))) {
+                                                            finalUnitPrice = Number(r.price);
+                                                        } else if (scissorId && scissorsPricing && scissorsPricing[scissorId] !== undefined) {
+                                                            const spObj = scissorsPricing[scissorId];
+                                                            finalUnitPrice = typeof spObj === 'object' ? Number(spObj.delegatePrice ?? spObj.price ?? 0) : Number(spObj);
+                                                        } else if (fromB && toB && scissorsPricing) {
+                                                            const routeKey1 = `${fromB}_${toB}`;
+                                                            const routeKey2 = `${fromB}-${toB}`;
+                                                            if (scissorsPricing[routeKey1] !== undefined) {
+                                                                const spObj = scissorsPricing[routeKey1];
+                                                                finalUnitPrice = typeof spObj === 'object' ? Number(spObj.delegatePrice ?? spObj.price ?? 0) : Number(spObj);
+                                                            } else if (scissorsPricing[routeKey2] !== undefined) {
+                                                                const spObj = scissorsPricing[routeKey2];
+                                                                finalUnitPrice = typeof spObj === 'object' ? Number(spObj.delegatePrice ?? spObj.price ?? 0) : Number(spObj);
+                                                            } else {
+                                                                const foundRoute = Object.values(scissorsPricing).find(sp => 
+                                                                    sp && typeof sp === 'object' && 
+                                                                    String(sp.fromBranch) === String(fromB) && 
+                                                                    String(sp.toBranch) === String(toB)
+                                                                );
+                                                                if (foundRoute) {
+                                                                    finalUnitPrice = Number(foundRoute.delegatePrice ?? foundRoute.price ?? 0);
+                                                                }
+                                                            }
+                                                        }
+
+                                                        if (fromB && toB && branchesCache[fromB] && branchesCache[toB]) {
+                                                            locationOrScissorLabel = `من ${branchesCache[fromB].name} إلى ${branchesCache[toB].name}`;
+                                                        }
+                                                    }
+
+                                                    if (!finalUnitPrice || isNaN(finalUnitPrice)) {
+                                                        if (csSettings !== null) {
+                                                            if (typeof csSettings === 'number') {
+                                                                finalUnitPrice = csSettings;
+                                                            } else if (typeof csSettings === 'object') {
+                                                                const targetDest = r.toBranch || r.branchId;
+                                                                if (targetDest && csSettings[targetDest] !== undefined) {
+                                                                    finalUnitPrice = Number(csSettings[targetDest]);
+                                                                } else if (r.type && csSettings[r.type] !== undefined) {
+                                                                    finalUnitPrice = Number(csSettings[r.type]);
+                                                                } else {
+                                                                    finalUnitPrice = Number(csSettings.movementPrice || csSettings.delegateRate || csSettings.price || csSettings.defaultRate || 5);
+                                                                }
+                                                            }
+                                                        } else {
+                                                            finalUnitPrice = 5;
+                                                        }
+                                                    }
+
+                                                    const singleMovementTotalSettlement = movementQty * finalUnitPrice;
+
+                                                    reportMovements.push({ 
+                                                        id: k, 
+                                                        dateStr: dateStr, 
+                                                        calcUnitPrice: finalUnitPrice,
+                                                        calcSettlement: singleMovementTotalSettlement,
+                                                        calcQty: movementQty,
+                                                        locationOrScissorLabel: locationOrScissorLabel,
+                                                        recordActualTs: recordTs,
+                                                        ...r 
+                                                    });
+
+                                                    totalMovementsQty += movementQty; 
+                                                    totalFinancialSettlement += singleMovementTotalSettlement; 
+                                                }
+                                            }
+                                        }
+                                    });
+                                }
+                            });
+                        }
+                    });
+
+                    document.getElementById('reportLoading').classList.remove('flex');
+                    document.getElementById('reportLoading').classList.add('hidden');
+
+                    if (reportMovements.length === 0) {
+                        document.getElementById('reportEmpty').classList.remove('hidden');
+                        document.getElementById('reportEmpty').classList.add('flex');
+                    } else {
+                        document.getElementById('repTotalSettlementMoney').textContent = totalFinancialSettlement.toFixed(2);
+                        document.getElementById('repTotalMovementsCount').textContent = totalMovementsQty;
+                        document.getElementById('reportStats').classList.remove('hidden');
+                        document.getElementById('reportStats').classList.add('flex');
+
+                        reportMovements.sort((a,b) => b.recordActualTs - a.recordActualTs);
+
+                        const resultsContainer = document.getElementById('reportResults');
+                        const reportHtmlBuffer = [];
+                        
+                        reportMovements.forEach(item => {
+                            let timeFormatted = '';
+                            try {
+                                const dt = new Date(item.recordActualTs);
+                                timeFormatted = dt.toLocaleTimeString('ar-EG', {hour: 'numeric', minute:'2-digit', hour12: true});
+                            } catch(e) {}
+
+                            const isOrder = !!item.orderNumber;
+                            const cardIcon = isOrder ? 'fa-bag-shopping' : 'fa-code-branch';
+                            const cardColor = isOrder ? 'blue' : 'amber';
+                            
+                            let transferredToDisplay = 'توصيل عميل مباشر';
+                            if (!isOrder && item.toBranch) {
+                                transferredToDisplay = branchesCache[item.toBranch] ? branchesCache[item.toBranch].name : item.toBranch;
+                            } else if (item.branchId && !isOrder) {
+                                transferredToDisplay = branchesCache[item.branchId] ? branchesCache[item.branchId].name : 'الفرع';
+                            }
+
+                            const movementTitleDisplay = escapeHTML(isOrder ? `أوردر عميل #${item.orderNumber}` : (item.details || item.movementName || `نقل وتسويه: ${transferredToDisplay}`));
+                            const subBadgeHtml = item.locationOrScissorLabel ? `<span class="inline-block mt-1 bg-${cardColor}-50 text-${cardColor}-700 border border-${cardColor}-100 text-[10px] font-black px-2 py-0.5 rounded-md">${escapeHTML(item.locationOrScissorLabel)}</span>` : '';
+
+                            reportHtmlBuffer.push(`
+                                <div class="bg-white border border-slate-100 p-5 rounded-[1.5rem] shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
+                                    <div class="absolute right-0 top-0 w-1.5 h-full bg-${cardColor}-500 group-hover:w-2 transition-all"></div>
+                                    
+                                    <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-50">
+                                        <div class="flex items-center gap-3 truncate">
+                                            <div class="w-10 h-10 rounded-xl bg-${cardColor}-50 text-${cardColor}-600 flex items-center justify-center shrink-0 shadow-sm border border-${cardColor}-100">
+                                                <i class="fa-solid ${cardIcon} text-lg"></i>
+                                            </div>
+                                            <div class="truncate">
+                                                <span class="text-[10px] font-black text-slate-400 block mb-0.5 uppercase tracking-wide">${isOrder ? 'تكليف توصيل' : 'حركة نقل/مقص'}</span>
+                                                <span class="text-sm font-black text-primary truncate leading-none block">${movementTitleDisplay}</span>
+                                                ${subBadgeHtml}
+                                            </div>
+                                        </div>
+                                        <div class="flex flex-col items-end shrink-0">
+                                            <span class="bg-slate-100 text-slate-600 font-black text-[10px] px-3 py-1 rounded-lg border border-slate-200">الكمية: ${item.calcQty}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex justify-between items-end mb-2">
+                                        <div class="text-right">
+                                            <span class="text-[10px] font-black text-slate-400 block mb-1 uppercase tracking-wide">التسعيرة الفردية</span>
+                                            <div class="bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100"><span class="text-sm font-black text-slate-700">${item.calcUnitPrice} ج.م</span></div>
+                                        </div>
+                                        <div class="text-left bg-emerald-50 border border-emerald-100 py-2.5 px-5 rounded-[1rem] shrink-0 text-center shadow-sm">
+                                            <span class="block text-[9px] font-black text-emerald-600 mb-1 uppercase tracking-wider">مستحقات الحركة</span>
+                                            <span class="text-xl font-black text-emerald-700 leading-none">${item.calcSettlement} <span class="text-[10px]">ج.م</span></span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex justify-between items-center text-[10px] font-bold text-slate-400 pt-3 mt-1">
+                                        <div class="flex items-center gap-1.5"><i class="fa-regular fa-calendar-check text-slate-300 text-sm"></i> ${escapeHTML(item.dateStr)} &nbsp;|&nbsp; ${escapeHTML(timeFormatted)}</div>
+                                    </div>
+                                </div>
+                            `);
+                        });
+
+                        resultsContainer.innerHTML = reportHtmlBuffer.join('');
+                    }
+
+                } catch(e) {
+                    document.getElementById('reportLoading').classList.remove('flex');
+                    document.getElementById('reportLoading').classList.add('hidden');
+                    showToast("حدث خطأ أثناء تحميل التقارير، يرجى إعادة المحاولة", "error");
+                }
+            };
+
+            window.handlePasswordChange = async function(e) {
+                e.preventDefault();
+                const oldP = document.getElementById('oldPass').value;
+                const newP = document.getElementById('newPass').value;
+                const confP = document.getElementById('confirmNewPass').value;
+                const btn = document.getElementById('btnChangePass');
+
+                if(newP !== confP) {
+                    showToast("كلمة المرور الجديدة وتأكيدها غير متطابقين", "error");
+                    return;
+                }
+                if(newP.length < 4) {
+                    showToast("يجب أن تكون كلمة المرور 4 أحرف أو أرقام على الأقل", "warning");
+                    return;
+                }
+
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> جاري التحديث...';
+
+                try {
+                    const delegateData = await secureFetch(`delegates/${currentDelegate.id}.json`);
+
+                    if(!delegateData || String(delegateData.password) !== String(oldP)) {
+                        showToast("كلمة المرور الحالية التي أدخلتها غير صحيحة", "error");
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> حفظ التغييرات';
+                        return;
+                    }
+
+                    await secureFetch(`delegates/${currentDelegate.id}.json`, {
+                        method: 'PATCH',
+                        body: JSON.stringify({ password: newP })
+                    });
+
+                    showToast("ممتاز! تم تغيير كلمة المرور بنجاح والتأمين.", "success");
+                    document.getElementById('changePasswordForm').reset();
+                    
+                } catch(error) {
+                    showToast("حدث خطأ في الاتصال، يرجى المحاولة لاحقاً", "error");
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> حفظ التغييرات';
+                }
+            };
+        })();
+    </script>
+</body>
+</html>

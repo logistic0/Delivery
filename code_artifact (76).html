@@ -1,0 +1,2915 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>تطبيق المندوب الاحترافي - الإصدار الذكي</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts: Cairo -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Tesseract.js for Receipt OCR -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Cairo', 'sans-serif'] },
+                    colors: {
+                        primary: '#0f172a',
+                        secondary: '#2563eb',
+                        accent: '#10b981',
+                        background: '#f8fafc'
+                    },
+                    boxShadow: {
+                        'soft': '0 10px 40px -10px rgba(0,0,0,0.08)',
+                        'glow-blue': '0 0 20px rgba(37, 99, 235, 0.35)',
+                        'glow-green': '0 0 20px rgba(16, 185, 129, 0.35)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        html, body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #f8fafc;
+            -webkit-tap-highlight-color: transparent;
+            overscroll-behavior-y: none;
+            height: 100%;
+            width: 100%;
+            overflow-x: hidden;
+        }
+        
+        * { user-select: none; -webkit-user-select: none; box-sizing: border-box; }
+        input, textarea, select { user-select: text; -webkit-user-select: text; }
+
+        /* Toasts */
+        #toast-container {
+            position: fixed;
+            top: max(16px, env(safe-area-inset-top));
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 999999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 92%;
+            max-width: 420px;
+            pointer-events: none;
+        }
+        .toast {
+            padding: 14px 18px;
+            border-radius: 16px;
+            color: white;
+            font-weight: 800;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.25);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            font-size: 13px;
+            backdrop-filter: blur(10px);
+            pointer-events: auto;
+        }
+        .toast.success { background: linear-gradient(135deg, #10b981, #059669); border: 1px solid rgba(255,255,255,0.2); }
+        .toast.error { background: linear-gradient(135deg, #ef4444, #dc2626); border: 1px solid rgba(255,255,255,0.2); }
+        .toast.warning { background: linear-gradient(135deg, #f59e0b, #d97706); border: 1px solid rgba(255,255,255,0.2); }
+        @keyframes slideDown { from { transform: translateY(-120%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        
+        /* Modals */
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.8);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(8px);
+            padding: 16px;
+            overflow-y: auto;
+        }
+        .modal.active { display: flex; animation: fadeIn 0.25s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.96) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+
+        /* Scanner Laser Animation */
+        .scanner-laser {
+            position: absolute;
+            left: 5%;
+            right: 5%;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, #10b981, #34d399, #10b981, transparent);
+            box-shadow: 0 0 15px #10b981, 0 0 30px #10b981;
+            animation: scanMove 2.2s infinite ease-in-out;
+            z-index: 20;
+        }
+        @keyframes scanMove {
+            0%, 100% { top: 10%; }
+            50% { top: 88%; }
+        }
+
+        /* Animations */
+        .new-order-pulse { animation: borderPulse 2s infinite; }
+        @keyframes borderPulse {
+            0% { border-color: rgba(16, 185, 129, 0.5); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+            70% { border-color: rgba(16, 185, 129, 1); box-shadow: 0 0 0 12px rgba(16, 185, 129, 0); }
+            100% { border-color: rgba(16, 185, 129, 0.5); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+        
+        .logo-bounce { animation: float 4s ease-in-out infinite; }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        #sidebarOverlay { transition: opacity 0.3s ease; }
+        #sidebarMenu { transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1); }
+        .view-section { display: none; animation: fadeIn 0.25s ease-out; }
+        .view-section.active { display: flex !important; flex-direction: column; }
+        
+        .glass-header {
+            background: rgba(15, 23, 42, 0.96);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            padding-top: env(safe-area-inset-top);
+        }
+
+        .pb-safe { padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); }
+    </style>
+</head>
+<body class="text-gray-800 h-[100dvh] flex flex-col relative overflow-hidden bg-slate-50">
+
+    <!-- Audio Alert -->
+    <audio id="newOrderSound" preload="auto">
+        <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+    </audio>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container"></div>
+
+    <!-- ==================== LOGIN SCREEN ==================== -->
+    <div id="loginScreen" class="fixed inset-0 bg-slate-100 z-[999] flex flex-col items-center justify-center p-4 sm:p-6 overflow-y-auto">
+        <div class="absolute top-[-10%] left-[-10%] w-64 h-64 sm:w-80 sm:h-80 bg-blue-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse pointer-events-none"></div>
+        <div class="absolute bottom-[-10%] right-[-10%] w-64 h-64 sm:w-80 sm:h-80 bg-emerald-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse delay-1000 pointer-events-none"></div>
+
+        <div class="bg-white/90 backdrop-blur-xl p-6 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] shadow-soft w-full max-w-md text-center relative border border-white/60 z-10 my-auto">
+            <div class="w-24 h-24 sm:w-28 sm:h-28 bg-gradient-to-tr from-primary to-secondary rounded-full flex items-center justify-center mx-auto mb-5 shadow-glow-blue logo-bounce relative">
+                <div class="absolute inset-0 border-4 border-white rounded-full opacity-20"></div>
+                <i class="fa-solid fa-motorcycle text-4xl sm:text-5xl text-white transform -scale-x-100 mt-1"></i>
+            </div>
+            
+            <h1 class="text-3xl sm:text-4xl font-black text-primary mb-1.5">بوابة المندوب</h1>
+            <p class="text-xs sm:text-sm font-bold text-gray-500 mb-6 tracking-wide">الإدارة الاحترافية الذكية - نظام مقصات</p>
+            
+            <div id="loginPendingMsg" class="hidden bg-amber-50/90 backdrop-blur border border-amber-200 text-amber-800 p-5 rounded-3xl mb-5 shadow-sm">
+                <div class="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <i class="fa-solid fa-hourglass-half text-2xl text-amber-500 animate-pulse"></i>
+                </div>
+                <h3 class="font-black text-lg mb-1">الجهاز قيد المراجعة</h3>
+                <p class="text-xs font-bold leading-relaxed">تم إرسال طلب اعتماد لجهازك للإدارة، يرجى الانتظار والمحاولة لاحقاً.</p>
+                <button onclick="window.location.reload()" class="mt-4 bg-amber-500 text-white w-full py-3.5 rounded-2xl font-black shadow-md hover:bg-amber-600 transition active:scale-95">تحديث الحالة</button>
+            </div>
+
+            <div id="loginBlockedMsg" class="hidden bg-red-50/90 backdrop-blur border border-red-200 text-red-800 p-5 rounded-3xl mb-5 shadow-sm">
+                <div class="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <i class="fa-solid fa-shield-halved text-2xl text-red-500"></i>
+                </div>
+                <h3 class="font-black text-lg mb-1">جهاز غير مصرح</h3>
+                <p class="text-xs font-bold">عذراً، هذا الجهاز محظور من الدخول للنظام.</p>
+            </div>
+
+            <div id="loginFormContainer">
+                <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
+                    <div class="relative group">
+                        <div class="absolute right-3.5 top-1/2 -translate-y-1/2 w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-secondary group-focus-within:bg-secondary group-focus-within:text-white transition-colors duration-300">
+                            <i class="fa-solid fa-id-badge text-lg"></i>
+                        </div>
+                        <input type="text" id="loginCode" required placeholder="كود المندوب" autocomplete="username" class="w-full pl-4 pr-16 py-4 bg-gray-50 border-2 border-transparent rounded-2xl outline-none focus:border-secondary focus:bg-white font-black text-base sm:text-lg transition-all shadow-sm">
+                    </div>
+                    <div class="relative group">
+                        <div class="absolute right-3.5 top-1/2 -translate-y-1/2 w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-secondary group-focus-within:bg-secondary group-focus-within:text-white transition-colors duration-300">
+                            <i class="fa-solid fa-lock text-lg"></i>
+                        </div>
+                        <input type="password" id="loginPass" required placeholder="كلمة المرور" autocomplete="current-password" class="w-full pl-4 pr-16 py-4 bg-gray-50 border-2 border-transparent rounded-2xl outline-none focus:border-secondary focus:bg-white font-black text-base sm:text-lg transition-all shadow-sm">
+                    </div>
+                    <button type="submit" id="loginBtn" class="w-full bg-primary text-white py-4 mt-2 rounded-2xl font-black text-lg sm:text-xl shadow-[0_8px_20px_rgb(15,23,42,0.3)] hover:shadow-[0_8px_25px_rgb(15,23,42,0.4)] transition-all active:scale-95 flex justify-center items-center gap-3">
+                        تسجيل الدخول <i class="fa-solid fa-arrow-left-long"></i>
+                    </button>
+                </form>
+            </div>
+            
+            <div id="loginLoading" class="hidden mt-6 flex flex-col items-center">
+                <div class="w-14 h-14 border-4 border-slate-100 border-t-secondary rounded-full animate-spin mb-3"></div>
+                <span class="font-black text-primary text-base">جاري التحقق من البيانات...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MAIN APP CONTAINER ==================== -->
+    <div id="appContainer" class="hidden flex-col h-[100dvh] w-full max-w-5xl mx-auto bg-slate-50 relative shadow-2xl">
+        
+        <!-- Header -->
+        <header class="glass-header text-white z-40 sticky top-0 shrink-0">
+            <div class="px-4 sm:px-6 py-3.5 flex justify-between items-center">
+                <div class="flex items-center gap-3 sm:gap-4 min-w-0">
+                    <button onclick="toggleSidebar()" aria-label="القائمة" class="w-11 h-11 sm:w-12 sm:h-12 bg-white/10 hover:bg-white/20 rounded-2xl flex items-center justify-center transition-all active:scale-90 border border-white/5 shrink-0">
+                        <i class="fa-solid fa-bars-staggered text-xl sm:text-2xl"></i>
+                    </button>
+                    <div class="flex flex-col justify-center min-w-0">
+                        <h1 class="text-lg sm:text-xl font-black tracking-wide leading-tight truncate" id="delegateNameDisplay">الاسم</h1>
+                        <p class="text-[11px] text-blue-200 font-bold bg-secondary/30 inline-block px-2.5 py-0.5 rounded-full mt-1 border border-secondary/50 w-max max-w-full truncate" id="branchNameDisplay">فرع</p>
+                    </div>
+                </div>
+                
+                <!-- Quick Action Buttons in Header -->
+                <div id="headerActionButtons" class="flex items-center gap-2 shrink-0">
+                    <button onclick="openScissorModal()" class="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white px-3 py-2.5 sm:px-3.5 sm:py-3 rounded-2xl font-black text-xs sm:text-sm shadow-md flex items-center gap-1.5 active:scale-95 transition-all border border-amber-400/40">
+                        <i class="fa-solid fa-code-branch text-sm sm:text-base"></i>
+                        <span>تسجيل مقصة</span>
+                    </button>
+                    <button onclick="openReceiptScannerModal()" class="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-3 py-2.5 sm:px-4 sm:py-3 rounded-2xl font-black text-xs sm:text-sm shadow-glow-green flex items-center gap-1.5 active:scale-95 transition-all border border-emerald-400/40">
+                        <i class="fa-solid fa-camera text-sm sm:text-base"></i>
+                        <span>تسجيل أوردر</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- System Membership Warning Banner (Shown if delegate is NOT verified inside the system) -->
+            <div id="systemRestrictionBanner" class="hidden bg-red-600/95 text-white px-4 py-2.5 text-xs sm:text-sm font-black flex items-center justify-between gap-3 border-t border-red-400/30">
+                <div class="flex items-center gap-2.5">
+                    <i class="fa-solid fa-ban text-lg shrink-0 animate-pulse"></i>
+                    <span id="systemRestrictionText">حسابك غير مفعل أو غير مسجل داخل المنظومة حالياً — تم إيقاف تسجيل الأوردرات والحركات.</span>
+                </div>
+                <button onclick="verifyDelegateSystemMembership(true)" class="bg-white/20 hover:bg-white/30 px-3 py-1 rounded-xl text-[11px] font-black shrink-0 transition">
+                    إعادة الفحص
+                </button>
+            </div>
+            
+            <!-- Live Stats Bar -->
+            <div id="headerStats" class="flex bg-slate-900/60 py-2.5 px-2 justify-around text-center text-sm font-bold border-t border-white/5">
+                <div class="flex-1 flex flex-col items-center justify-center px-1">
+                    <span class="text-slate-400 text-[10px] sm:text-xs font-black tracking-wider mb-0.5">أوردرات معلقة</span>
+                    <span id="statPendingCount" class="text-lg sm:text-xl font-black text-white">0</span>
+                </div>
+                <div class="w-px bg-white/10 my-1"></div>
+                <div class="flex-1 flex flex-col items-center justify-center px-1">
+                    <span class="text-slate-400 text-[10px] sm:text-xs font-black tracking-wider mb-0.5">حركات اليوم</span>
+                    <span id="statTotalTodayOrders" class="text-lg sm:text-xl font-black text-accent">0</span>
+                </div>
+                <div class="w-px bg-white/10 my-1"></div>
+                <div class="flex-1 flex flex-col items-center justify-center px-1">
+                    <span class="text-slate-400 text-[10px] sm:text-xs font-black tracking-wider mb-0.5">نقدي للتحصيل</span>
+                    <div class="flex items-baseline gap-1">
+                        <span id="statTotalCash" class="text-lg sm:text-xl font-black text-white">0</span>
+                        <span class="text-[9px] text-slate-300">ج.م</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Sidebar Menu -->
+        <div id="sidebarOverlay" class="fixed inset-0 bg-slate-900/65 z-50 hidden opacity-0 backdrop-blur-sm" onclick="toggleSidebar()"></div>
+        <div id="sidebarMenu" class="fixed top-0 right-0 h-full w-[82%] max-w-xs sm:max-w-sm bg-slate-50 z-50 transform translate-x-full shadow-[20px_0_50px_rgba(0,0,0,0.5)] flex flex-col transition-transform duration-350 rounded-l-[2.5rem] overflow-hidden">
+            <div class="bg-primary p-6 sm:p-8 text-white text-center relative overflow-hidden">
+                <div class="absolute -right-10 -top-10 w-40 h-40 bg-secondary rounded-full filter blur-3xl opacity-40"></div>
+                <div class="w-20 h-20 sm:w-24 sm:h-24 bg-white/10 rounded-[2rem] mx-auto flex items-center justify-center mb-3 border border-white/20 backdrop-blur-md shadow-lg">
+                    <i class="fa-solid fa-user-astronaut text-4xl sm:text-5xl"></i>
+                </div>
+                <h2 class="text-xl sm:text-2xl font-black relative z-10 truncate" id="sideNameDisplay">الاسم</h2>
+                <p class="text-xs sm:text-sm font-bold text-blue-200 mt-2 bg-black/30 inline-block px-4 py-1.5 rounded-full relative z-10 border border-white/10" id="sideCodeDisplay">كود: </p>
+            </div>
+            
+            <div class="flex-grow p-4 sm:p-5 space-y-2.5 overflow-y-auto">
+                <button onclick="switchView('home')" class="w-full flex items-center gap-3.5 p-3.5 sm:p-4 rounded-2xl font-black text-gray-700 hover:bg-white hover:text-primary hover:shadow-soft transition-all active:scale-95 group">
+                    <div class="w-11 h-11 rounded-xl bg-blue-50 group-hover:bg-secondary group-hover:text-white flex items-center justify-center text-lg transition-colors text-secondary shrink-0"><i class="fa-solid fa-house"></i></div>
+                    <span class="text-base sm:text-lg">الأوردرات والمقصات المعلقة</span>
+                </button>
+                <button id="sideBtnOrder" onclick="toggleSidebar(); openReceiptScannerModal();" class="w-full flex items-center gap-3.5 p-3.5 sm:p-4 rounded-2xl font-black text-gray-700 hover:bg-white hover:text-emerald-700 hover:shadow-soft transition-all active:scale-95 group">
+                    <div class="w-11 h-11 rounded-xl bg-emerald-50 group-hover:bg-emerald-500 group-hover:text-white flex items-center justify-center text-lg transition-colors text-emerald-600 shrink-0"><i class="fa-solid fa-camera"></i></div>
+                    <span class="text-base sm:text-lg">تسجيل أوردر بالكاميرا</span>
+                </button>
+                <button id="sideBtnScissor" onclick="toggleSidebar(); openScissorModal();" class="w-full flex items-center gap-3.5 p-3.5 sm:p-4 rounded-2xl font-black text-gray-700 hover:bg-white hover:text-amber-700 hover:shadow-soft transition-all active:scale-95 group">
+                    <div class="w-11 h-11 rounded-xl bg-amber-50 group-hover:bg-amber-500 group-hover:text-white flex items-center justify-center text-lg transition-colors text-amber-600 shrink-0"><i class="fa-solid fa-code-branch"></i></div>
+                    <span class="text-base sm:text-lg">تسجيل مقصة (نقل فرع)</span>
+                </button>
+                <button onclick="switchView('reports')" class="w-full flex items-center gap-3.5 p-3.5 sm:p-4 rounded-2xl font-black text-gray-700 hover:bg-white hover:text-emerald-700 hover:shadow-soft transition-all active:scale-95 group">
+                    <div class="w-11 h-11 rounded-xl bg-teal-50 group-hover:bg-accent group-hover:text-white flex items-center justify-center text-lg transition-colors text-accent shrink-0"><i class="fa-solid fa-wallet"></i></div>
+                    <span class="text-base sm:text-lg">التقارير والتسويات</span>
+                </button>
+                <button onclick="switchView('settings')" class="w-full flex items-center gap-3.5 p-3.5 sm:p-4 rounded-2xl font-black text-gray-700 hover:bg-white hover:text-purple-700 hover:shadow-soft transition-all active:scale-95 group">
+                    <div class="w-11 h-11 rounded-xl bg-purple-50 group-hover:bg-purple-600 group-hover:text-white flex items-center justify-center text-lg transition-colors text-purple-600 shrink-0"><i class="fa-solid fa-gear"></i></div>
+                    <span class="text-base sm:text-lg">الإعدادات والأمان</span>
+                </button>
+            </div>
+            
+            <div class="p-4 sm:p-6 bg-white border-t border-slate-100 pb-safe">
+                <button onclick="logout()" class="w-full flex items-center justify-center gap-3 p-3.5 sm:p-4 rounded-2xl font-black text-red-500 bg-red-50 hover:bg-red-500 hover:text-white transition-all active:scale-95">
+                    <i class="fa-solid fa-arrow-right-from-bracket text-lg"></i> <span>تسجيل الخروج</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- ==================== VIEW 1: HOME (PENDING ORDERS) ==================== -->
+        <main id="view-home" class="view-section active flex-grow p-3.5 sm:p-6 overflow-y-auto pb-28 relative">
+            <div id="ordersLoading" class="absolute inset-0 flex flex-col items-center justify-center z-10 text-secondary bg-slate-50/90 backdrop-blur-sm rounded-[2rem] m-2">
+                <div class="w-20 h-20 bg-white rounded-[2rem] shadow-soft flex items-center justify-center mb-4">
+                    <i class="fa-solid fa-motorcycle fa-bounce text-4xl sm:text-5xl"></i>
+                </div>
+                <p class="font-black text-lg sm:text-xl text-primary">جاري جلب الأوردرات المعلقة...</p>
+            </div>
+            
+            <!-- Responsive Grid for Orders -->
+            <div id="ordersList" class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5"></div>
+            
+            <div id="noOrdersMsg" class="hidden flex flex-col items-center justify-center h-full min-h-[60vh] text-gray-400 text-center px-4">
+                <div class="w-28 h-28 sm:w-32 sm:h-32 bg-white shadow-soft rounded-full flex items-center justify-center mb-5">
+                    <i class="fa-solid fa-mug-hot text-5xl sm:text-6xl text-slate-300"></i>
+                </div>
+                <h3 class="text-xl sm:text-2xl font-black text-slate-600 mb-1.5">لا توجد أوردرات أو مقصات معلقة حالياً</h3>
+                <p class="text-xs sm:text-sm font-bold text-slate-400 mb-6 max-w-xs">يمكنك تصوير أي ريسيت لتسجيل أوردر جديد أو تسجيل حركة مقصة لفرع آخر.</p>
+                <div id="emptyStateActionButtons" class="flex flex-col sm:flex-row gap-3 w-full max-w-md justify-center">
+                    <button onclick="openReceiptScannerModal()" class="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-5 py-4 rounded-2xl font-black text-sm sm:text-base shadow-glow-green flex items-center justify-center gap-2.5 active:scale-95 transition-all">
+                        <i class="fa-solid fa-camera text-lg"></i> تصوير ريسيت (أوردر)
+                    </button>
+                    <button onclick="openScissorModal()" class="bg-gradient-to-r from-amber-500 to-orange-600 text-white px-5 py-4 rounded-2xl font-black text-sm sm:text-base shadow-md flex items-center justify-center gap-2.5 active:scale-95 transition-all">
+                        <i class="fa-solid fa-code-branch text-lg"></i> تسجيل مقصة (فرع)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Floating Action Buttons -->
+            <div class="fixed bottom-4 left-4 right-4 max-w-5xl mx-auto flex justify-between items-center pointer-events-none z-30 gap-2">
+                <button onclick="fetchMyOrders(true)" aria-label="تحديث" class="pointer-events-auto w-13 h-13 sm:w-15 sm:h-15 p-3.5 bg-gradient-to-tr from-secondary to-blue-400 text-white rounded-full shadow-glow-blue flex items-center justify-center text-lg sm:text-xl active:scale-90 transition-transform border-[3px] border-white shrink-0">
+                    <i class="fa-solid fa-rotate"></i>
+                </button>
+
+                <div id="floatingActionButtons" class="flex items-center gap-2 pointer-events-auto">
+                    <button onclick="openScissorModal()" aria-label="تسجيل مقصة" class="bg-gradient-to-r from-amber-500 to-orange-600 text-white h-13 sm:h-15 py-3 px-4 sm:px-5 rounded-full shadow-lg flex items-center justify-center gap-2 text-xs sm:text-base font-black active:scale-90 transition-transform border-[3px] border-white">
+                        <i class="fa-solid fa-code-branch text-base sm:text-xl"></i>
+                        <span>تسجيل مقصة</span>
+                    </button>
+                    <button onclick="openReceiptScannerModal()" aria-label="تسجيل أوردر جديد" class="bg-gradient-to-r from-emerald-500 to-teal-600 text-white h-13 sm:h-15 py-3 px-4 sm:px-5 rounded-full shadow-glow-green flex items-center justify-center gap-2 text-xs sm:text-base font-black active:scale-90 transition-transform border-[3px] border-white">
+                        <i class="fa-solid fa-camera text-base sm:text-xl"></i>
+                        <span>مسح ريسيت</span>
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <!-- ==================== VIEW 2: REPORTS & SETTLEMENTS ==================== -->
+        <main id="view-reports" class="view-section flex-grow overflow-hidden flex-col relative bg-slate-50">
+            <div class="bg-white px-4 sm:px-6 pt-4 pb-5 shadow-[0_10px_20px_rgba(0,0,0,0.03)] border-b border-gray-100 z-20 shrink-0 rounded-b-[2rem] relative">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-11 h-11 sm:w-12 sm:h-12 bg-gradient-to-tr from-accent to-emerald-400 rounded-xl flex items-center justify-center text-white shadow-glow-green">
+                            <i class="fa-solid fa-chart-line text-xl sm:text-2xl"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-xl sm:text-2xl font-black text-primary leading-tight">التقارير والتسويات</h2>
+                            <span class="text-xs font-bold text-gray-400">تصفية واحتساب المستحقات بدقة</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                    <div>
+                        <label class="block text-[11px] font-black text-gray-500 mb-1 ml-1">من وقت وتاريخ</label>
+                        <input type="datetime-local" id="repFromDate" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-bold focus:outline-none focus:border-accent focus:ring-2 focus:ring-emerald-100 transition-all text-gray-700">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-black text-gray-500 mb-1 ml-1">إلى وقت وتاريخ</label>
+                        <input type="datetime-local" id="repToDate" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-bold focus:outline-none focus:border-accent focus:ring-2 focus:ring-emerald-100 transition-all text-gray-700">
+                    </div>
+                    <div class="sm:col-span-2 relative">
+                        <label class="block text-[11px] font-black text-gray-500 mb-1 ml-1">تصفية حسب الفرع</label>
+                        <div class="relative">
+                            <select id="repBranchFilter" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm font-bold focus:outline-none focus:border-accent focus:ring-2 focus:ring-emerald-100 appearance-none pr-4 pl-10 transition-all text-gray-700">
+                                <option value="all">كل الحركات (جميع الفروع والأوردرات)</option>
+                            </select>
+                            <div class="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm pointer-events-none">
+                                <i class="fa-solid fa-chevron-down text-gray-400 text-sm"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <button onclick="generateReport()" class="w-full bg-primary text-white py-3.5 sm:py-4 rounded-xl font-black text-base sm:text-lg shadow-[0_8px_20px_rgb(15,23,42,0.2)] hover:bg-slate-800 active:scale-95 transition-all flex justify-center items-center gap-2">
+                    <i class="fa-solid fa-magnifying-glass"></i> استخراج التقرير
+                </button>
+            </div>
+
+            <div class="flex-grow overflow-y-auto p-4 sm:p-6 pb-24 relative" id="reportScrollContent">
+                <div id="reportStats" class="hidden grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                    <div class="bg-gradient-to-r from-accent to-emerald-500 p-5 sm:p-6 rounded-[2rem] shadow-glow-green relative overflow-hidden flex justify-between items-center text-white">
+                        <div class="absolute -right-5 -bottom-5 w-24 h-24 bg-white/20 rounded-full blur-xl"></div>
+                        <div class="relative z-10">
+                            <span class="text-xs font-black text-emerald-100 block mb-1 uppercase tracking-wider">إجمالي المستحق</span>
+                            <div class="text-3xl sm:text-4xl font-black tracking-tight"><span id="repTotalSettlementMoney">0.00</span> <span class="text-sm font-bold opacity-80">ج.م</span></div>
+                        </div>
+                        <div class="w-14 h-14 sm:w-16 sm:h-16 bg-white/20 rounded-[1.5rem] flex items-center justify-center border border-white/20 backdrop-blur-sm relative z-10">
+                            <i class="fa-solid fa-sack-dollar text-2xl sm:text-3xl"></i>
+                        </div>
+                    </div>
+
+                    <div class="bg-white border border-slate-100 p-5 rounded-[2rem] shadow-soft flex items-center justify-between">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-secondary text-xl"><i class="fa-solid fa-route"></i></div>
+                            <div>
+                                <span class="block text-[11px] font-black text-gray-400 uppercase tracking-wider">عدد الحركات المنفذة</span>
+                                <span class="block text-sm font-bold text-gray-700">أوردرات / نقل فروع</span>
+                            </div>
+                        </div>
+                        <div class="text-3xl font-black text-primary"><span id="repTotalMovementsCount">0</span></div>
+                    </div>
+                </div>
+
+                <div id="reportLoading" class="hidden flex-col items-center justify-center py-12 text-accent">
+                    <div class="w-16 h-16 bg-emerald-50 rounded-[2rem] flex items-center justify-center mb-4 shadow-sm border border-emerald-100">
+                        <i class="fa-solid fa-spinner fa-spin text-3xl"></i>
+                    </div>
+                    <p class="font-black text-lg text-slate-700">جاري تحليل العمليات...</p>
+                </div>
+
+                <div id="reportResults" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+                
+                <div id="reportEmpty" class="hidden flex-col items-center justify-center py-16 text-gray-400 text-center">
+                    <div class="w-24 h-24 bg-white shadow-soft rounded-full flex items-center justify-center mb-5">
+                        <i class="fa-solid fa-box-open text-5xl text-slate-300"></i>
+                    </div>
+                    <p class="font-black text-xl text-slate-600 mb-1">لا توجد حركات مطابقة</p>
+                    <p class="text-sm font-bold text-slate-400">تأكد من اختيار التواريخ والفرع الصحيح.</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- ==================== VIEW 3: SETTINGS ==================== -->
+        <main id="view-settings" class="view-section flex-grow p-4 sm:p-6 overflow-y-auto pb-16 relative">
+            <div class="max-w-lg mx-auto w-full">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="w-12 h-12 bg-gradient-to-tr from-purple-600 to-purple-400 rounded-xl flex items-center justify-center text-white shadow-lg shadow-purple-500/30">
+                        <i class="fa-solid fa-gear text-2xl"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-2xl font-black text-primary leading-tight">الإعدادات</h2>
+                        <span class="text-xs font-bold text-gray-400">إدارة الحساب والأمان</span>
+                    </div>
+                </div>
+                
+                <div class="bg-white p-6 sm:p-7 rounded-[2rem] shadow-soft border border-slate-100 relative overflow-hidden">
+                    <div class="absolute right-0 top-0 w-2 h-full bg-purple-500"></div>
+                    <h3 class="font-black text-lg sm:text-xl text-slate-800 mb-6 flex items-center gap-2"><i class="fa-solid fa-shield-halved text-purple-500 text-2xl"></i> تغيير كلمة المرور</h3>
+                    
+                    <form id="changePasswordForm" onsubmit="handlePasswordChange(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-black text-slate-500 mb-1.5 ml-1">كلمة المرور الحالية</label>
+                            <input type="password" id="oldPass" required class="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-purple-500 focus:bg-white focus:ring-4 focus:ring-purple-100 text-left tracking-widest font-black transition-all shadow-sm" dir="ltr">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-slate-500 mb-1.5 ml-1">كلمة المرور الجديدة</label>
+                            <input type="password" id="newPass" required minlength="4" class="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-purple-500 focus:bg-white focus:ring-4 focus:ring-purple-100 text-left tracking-widest font-black transition-all shadow-sm" dir="ltr">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-slate-500 mb-1.5 ml-1">تأكيد كلمة المرور</label>
+                            <input type="password" id="confirmNewPass" required minlength="4" class="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-purple-500 focus:bg-white focus:ring-4 focus:ring-purple-100 text-left tracking-widest font-black transition-all shadow-sm" dir="ltr">
+                        </div>
+                        <button type="submit" id="btnChangePass" class="w-full bg-purple-600 text-white py-4 rounded-2xl font-black text-base sm:text-lg shadow-[0_8px_20px_rgba(147,51,234,0.3)] hover:bg-purple-700 active:scale-95 transition-all mt-4 flex justify-center items-center gap-2">
+                            <i class="fa-solid fa-floppy-disk"></i> حفظ التغييرات
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ==================== MODAL 1: RECEIPT SCANNER & ORDER REGISTRATION ==================== -->
+    <div id="receiptScannerModal" class="modal">
+        <div class="bg-white rounded-[2rem] sm:rounded-[2.5rem] shadow-2xl w-full max-w-lg max-h-[92dvh] flex flex-col overflow-hidden relative my-auto">
+            
+            <!-- Modal Header -->
+            <div class="bg-primary text-white px-5 py-4 flex justify-between items-center shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-emerald-500/20 border border-emerald-400/30 rounded-xl flex items-center justify-center text-emerald-400">
+                        <i class="fa-solid fa-receipt text-xl"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-lg sm:text-xl font-black leading-tight">تسجيل أوردر من الريسيت</h2>
+                        <p class="text-[11px] text-slate-300 font-bold">تصوير الفاتورة واستخراج البيانات تلقائياً</p>
+                    </div>
+                </div>
+                <button onclick="closeReceiptScannerModal()" class="w-10 h-10 bg-white/10 hover:bg-red-500/80 rounded-xl flex items-center justify-center text-white transition-colors">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body (Scrollable) -->
+            <div class="p-4 sm:p-6 overflow-y-auto flex-grow space-y-5">
+                
+                <!-- STEP 1: CAMERA / IMAGE CAPTURE -->
+                <div id="scannerStepCamera" class="space-y-4">
+                    <div class="relative w-full aspect-[3/4] max-h-[340px] bg-slate-900 rounded-3xl overflow-hidden border-2 border-slate-200 shadow-inner flex items-center justify-center">
+                        <!-- Live Video Stream -->
+                        <video id="cameraVideo" autoplay playsinline muted class="w-full h-full object-cover"></video>
+                        
+                        <!-- Captured Image Preview -->
+                        <img id="capturedReceiptImg" class="hidden w-full h-full object-contain bg-slate-950" alt="صورة الريسيت" />
+                        
+                        <!-- Camera Guide Overlay -->
+                        <div id="cameraGuideOverlay" class="absolute inset-4 border-2 border-dashed border-emerald-400/70 rounded-2xl pointer-events-none flex flex-col justify-between p-3">
+                            <div class="scanner-laser"></div>
+                            <span class="bg-black/60 backdrop-blur-sm text-white text-[11px] font-bold px-3 py-1 rounded-full self-center">
+                                ضع الريسيت بوضوح داخل الإطار
+                            </span>
+                            <span class="bg-emerald-500/80 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full self-center">
+                                تأكد من وضوح رقم الأوردر وصافي الفاتورة
+                            </span>
+                        </div>
+
+                        <!-- Camera Error / Fallback State -->
+                        <div id="cameraFallbackMsg" class="hidden absolute inset-0 bg-slate-900/95 text-white p-6 flex flex-col items-center justify-center text-center">
+                            <i class="fa-solid fa-camera-slash text-4xl text-amber-400 mb-3"></i>
+                            <p class="font-black text-base mb-1">الكاميرا المباشرة غير متاحة</p>
+                            <p class="text-xs text-slate-300 mb-4">يمكنك استخدام زر "التقاط / اختيار صورة" بالأسفل لفتح كاميرا الهاتف مباشرة.</p>
+                        </div>
+
+                        <!-- OCR Processing Overlay -->
+                        <div id="ocrLoadingOverlay" class="hidden absolute inset-0 bg-slate-900/90 backdrop-blur-md text-white p-6 flex flex-col items-center justify-center text-center z-30">
+                            <div class="w-16 h-16 border-4 border-emerald-500/30 border-t-emerald-400 rounded-full animate-spin mb-4"></div>
+                            <h4 class="font-black text-lg text-emerald-400 mb-1" id="ocrStatusText">جاري قراءة الريسيت بالذكاء الاصطناعي...</h4>
+                            <p class="text-xs text-slate-300 font-bold" id="ocrProgressText">تحليل الأرقام والنصوص بدقة عالية</p>
+                        </div>
+                    </div>
+
+                    <!-- Camera Controls -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <button type="button" id="btnCapturePhoto" onclick="captureAndProcessReceipt()" class="col-span-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white py-4 rounded-2xl font-black text-lg shadow-glow-green active:scale-95 transition-all flex items-center justify-center gap-2.5">
+                            <i class="fa-solid fa-camera text-xl"></i> التقاط وقراءة الريسيت
+                        </button>
+
+                        <label class="bg-blue-50 hover:bg-blue-100 text-secondary border border-blue-200 py-3.5 px-3 rounded-2xl font-black text-xs sm:text-sm cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-2 text-center">
+                            <i class="fa-solid fa-image text-base"></i>
+                            <span>كاميرا الهاتف / المعرض</span>
+                            <input type="file" id="receiptFileInput" accept="image/*" capture="environment" class="hidden" onchange="handleFileUploadReceipt(event)">
+                        </label>
+
+                        <button type="button" onclick="skipToManualEntry()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 py-3.5 px-3 rounded-2xl font-black text-xs sm:text-sm active:scale-95 transition-all flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-keyboard text-base"></i>
+                            <span>إدخال يدوي سريع</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- STEP 2: EXTRACTED DATA & REGION SELECTION -->
+                <form id="registerOrderForm" onsubmit="submitScannedOrder(event)" class="hidden space-y-4">
+                    
+                    <!-- Retake Banner -->
+                    <div class="flex items-center justify-between bg-emerald-50 border border-emerald-200 px-4 py-2.5 rounded-2xl">
+                        <div class="flex items-center gap-2 text-emerald-800 text-xs font-black">
+                            <i class="fa-solid fa-wand-magic-sparkles text-emerald-600 text-base"></i>
+                            <span id="scanResultBadge">تم استخراج البيانات - يرجى المراجعة</span>
+                        </div>
+                        <button type="button" onclick="resetScannerToCamera()" class="text-xs font-black text-secondary underline hover:text-blue-800">
+                            إعادة التصوير
+                        </button>
+                    </div>
+
+                    <!-- Order Number, Order Value & Receipt Count (عدد الريسيت = 1 افتراضي) -->
+                    <div class="grid grid-cols-12 gap-2.5">
+                        <div class="col-span-5">
+                            <label class="block text-[11px] font-black text-slate-600 mb-1.5">
+                                رقم الأوردر <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" id="scanOrderNumber" required placeholder="313689" class="w-full px-2.5 py-3.5 bg-slate-50 border-2 border-slate-200 rounded-2xl font-black text-base text-primary focus:border-secondary focus:bg-white outline-none text-center tracking-wider" dir="ltr">
+                        </div>
+                        <div class="col-span-4">
+                            <label class="block text-[11px] font-black text-slate-600 mb-1.5">
+                                قيمة الأوردر <span class="text-red-500">*</span>
+                            </label>
+                            <div class="relative">
+                                <input type="number" step="0.01" min="0" id="scanOrderValue" required placeholder="0.00" oninput="recalculateScannedOrderTotals()" class="w-full px-2 py-3.5 bg-slate-50 border-2 border-slate-200 rounded-2xl font-black text-base text-emerald-700 focus:border-emerald-500 focus:bg-white outline-none text-center" dir="ltr">
+                            </div>
+                        </div>
+                        <div class="col-span-3">
+                            <label class="block text-[11px] font-black text-slate-600 mb-1.5 text-center">
+                                عدد الريسيت <span class="text-red-500">*</span>
+                            </label>
+                            <input type="number" id="scanReceiptCount" min="1" max="50" value="1" required oninput="recalculateScannedOrderTotals()" class="w-full px-2 py-3.5 bg-blue-50/70 border-2 border-blue-200 rounded-2xl font-black text-base text-secondary focus:border-secondary focus:bg-white outline-none text-center" dir="ltr">
+                        </div>
+                    </div>
+
+                    <!-- Region Selection with Smart Live Search -->
+                    <div class="bg-indigo-50/70 border-2 border-indigo-200 p-4 rounded-2xl space-y-2.5 relative">
+                        <div class="flex justify-between items-center">
+                            <label class="block text-xs sm:text-sm font-black text-indigo-950">
+                                <i class="fa-solid fa-map-location-dot text-indigo-600 ml-1"></i> المنطقة المتجه إليها <span class="text-red-500">*</span>
+                            </label>
+                            <span id="selectedRegionFeeBadge" class="hidden bg-indigo-600 text-white text-[11px] font-black px-2.5 py-0.5 rounded-lg">
+                                التوصيل: 0 ج.م
+                            </span>
+                        </div>
+                        
+                        <!-- Enhanced Smart Search Input -->
+                        <div class="relative">
+                            <input type="text" id="regionSearchInput" autocomplete="off" placeholder="اكتب للبحث عن المنطقة (مثال: السلام، اسبيكو...)" oninput="handleRegionSearchInput()" onfocus="openRegionSearchResults()" class="w-full pl-9 pr-3.5 py-3 bg-white border-2 border-indigo-200 rounded-xl text-xs sm:text-sm font-black text-slate-800 focus:outline-none focus:border-indigo-500 shadow-sm">
+                            <button type="button" id="clearRegionSearchBtn" onclick="clearRegionSearch()" class="hidden absolute left-8 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 px-1.5">
+                                <i class="fa-solid fa-circle-xmark text-sm"></i>
+                            </button>
+                            <i class="fa-solid fa-magnifying-glass text-indigo-400 absolute left-3 top-1/2 -translate-y-1/2 text-xs pointer-events-none"></i>
+                            
+                            <!-- Live Search Results Dropdown List -->
+                            <div id="regionSearchResultsList" class="hidden absolute left-0 right-0 top-full mt-1.5 bg-white border-2 border-indigo-300 rounded-2xl shadow-2xl max-h-52 overflow-y-auto z-50 divide-y divide-slate-100"></div>
+                        </div>
+
+                        <!-- Synchronized Select Dropdown -->
+                        <div class="relative">
+                            <select id="scanRegionSelect" required onchange="onRegionSelectChange()" class="w-full bg-white border-2 border-indigo-300 rounded-xl p-3.5 text-sm font-black text-slate-800 focus:outline-none focus:border-indigo-600 appearance-none pr-3.5 pl-10">
+                                <option value="">-- اختر المنطقة من القائمة --</option>
+                            </select>
+                            <div class="absolute left-3 top-1/2 -translate-y-1/2 w-7 h-7 bg-indigo-50 rounded-lg flex items-center justify-center pointer-events-none text-indigo-600">
+                                <i class="fa-solid fa-chevron-down text-xs"></i>
+                            </div>
+                        </div>
+                        <div id="regionsStatusHint" class="hidden text-[11px] font-bold text-amber-700 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200"></div>
+                    </div>
+
+                    <!-- Payment Method & Customer Phone -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-black text-slate-600 mb-1.5">طريقة التحصيل</label>
+                            <select id="scanPaymentMethod" class="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3.5 text-sm font-black text-slate-700 focus:border-secondary focus:bg-white outline-none">
+                                <option value="نقدي">نقدي (كاش)</option>
+                                <option value="فيزا">فيزا</option>
+                                <option value="انستاباي">انستاباي</option>
+                                <option value="محفظة">محفظة إلكترونية</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-slate-600 mb-1.5">رقم هاتف العميل (اختياري)</label>
+                            <input type="tel" id="scanCustomerPhone" placeholder="01xxxxxxxxx" class="w-full px-3.5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm text-slate-700 focus:border-secondary focus:bg-white outline-none text-left" dir="ltr">
+                        </div>
+                    </div>
+
+                    <!-- Extracted Address (Editable) -->
+                    <div>
+                        <label class="block text-xs font-black text-slate-600 mb-1.5">عنوان العميل (مستخرج من الريسيت)</label>
+                        <input type="text" id="scanCustomerAddress" placeholder="تفاصيل العنوان..." class="w-full px-3.5 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-xs sm:text-sm text-slate-700 focus:border-secondary focus:bg-white outline-none">
+                    </div>
+
+                    <!-- Financial Summary Box -->
+                    <div class="bg-slate-900 text-white p-4 rounded-2xl flex justify-between items-center shadow-md">
+                        <div>
+                            <span class="text-[11px] text-slate-400 font-bold block">إجمالي المطلوب تحصيله من العميل</span>
+                            <span class="text-xs text-emerald-400 font-bold" id="scanSummaryBreakdown">قيمة الفاتورة شاملة التوصيل</span>
+                        </div>
+                        <div class="text-2xl font-black text-white">
+                            <span id="scanTotalDisplay">0.00</span> <span class="text-xs text-slate-400">ج.م</span>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button type="submit" id="btnSubmitScannedOrder" class="w-full bg-gradient-to-r from-emerald-500 to-teal-600 text-white py-4 rounded-2xl font-black text-lg shadow-glow-green hover:from-emerald-600 hover:to-teal-700 active:scale-95 transition-all flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-check-circle text-xl"></i> تأكيد وإضافة للأوردرات المعلقة
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MODAL 3: REGISTER SCISSOR (تسجيل مقصة - مبسط واحترافي بدون عدد حركات أو ملاحظات) ==================== -->
+    <div id="scissorRegisterModal" class="modal">
+        <div class="bg-white rounded-[2rem] sm:rounded-[2.5rem] shadow-2xl w-full max-w-md max-h-[92dvh] flex flex-col overflow-hidden relative my-auto">
+            <!-- Modal Header -->
+            <div class="bg-gradient-to-r from-amber-600 to-orange-600 text-white px-5 py-4 flex justify-between items-center shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-white/20 border border-white/30 rounded-xl flex items-center justify-center text-white">
+                        <i class="fa-solid fa-code-branch text-xl"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-lg sm:text-xl font-black leading-tight">تسجيل مقصة (نقل فرع)</h2>
+                        <p class="text-[11px] text-amber-100 font-bold">اختر الفرع المتجه إليه ثم اضغط تأكيد</p>
+                    </div>
+                </div>
+                <button onclick="closeScissorModal()" class="w-10 h-10 bg-white/10 hover:bg-black/20 rounded-xl flex items-center justify-center text-white transition-colors">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body -->
+            <form id="registerScissorForm" onsubmit="submitScissorMovement(event)" class="p-5 sm:p-6 space-y-4 overflow-y-auto flex-grow">
+                
+                <!-- From Branch (Current Delegate Branch) -->
+                <div class="bg-slate-50 border border-slate-200 p-3.5 rounded-2xl flex items-center justify-between">
+                    <div>
+                        <span class="text-[10px] font-black text-slate-400 block">فرع الانطلاق (فرعك الحالي)</span>
+                        <span class="text-sm font-black text-primary" id="scissorFromBranchName">الفرع الرئيسي</span>
+                    </div>
+                    <div class="w-9 h-9 rounded-xl bg-blue-50 text-secondary flex items-center justify-center">
+                        <i class="fa-solid fa-store"></i>
+                    </div>
+                </div>
+
+                <!-- Target Branch Buttons Grid -->
+                <div class="bg-amber-50/70 border-2 border-amber-200 p-4 rounded-2xl space-y-3">
+                    <div class="flex justify-between items-center">
+                        <label class="block text-xs sm:text-sm font-black text-amber-950">
+                            <i class="fa-solid fa-hand-pointer text-amber-600 ml-1"></i> اختر الفرع المتجه إليه <span class="text-red-500">*</span>
+                        </label>
+                        <span id="selectedScissorBranchBadge" class="hidden bg-amber-600 text-white text-[11px] font-black px-2.5 py-0.5 rounded-lg">
+                            تم التحديد
+                        </span>
+                    </div>
+
+                    <input type="hidden" id="scissorToBranchSelect" value="">
+                    <div id="scissorBranchesButtonsGrid" class="grid grid-cols-2 gap-2.5 max-h-64 overflow-y-auto pr-0.5"></div>
+                </div>
+
+                <!-- Info Banner -->
+                <div class="bg-blue-50 text-blue-800 p-3.5 rounded-2xl text-xs font-bold flex items-start gap-2.5 border border-blue-100">
+                    <i class="fa-solid fa-circle-info text-blue-600 text-base mt-0.5 shrink-0"></i>
+                    <span>ستظهر هذه الحركة في قائمة المعلقات لديك ولدى إدارة الفرع لتأكيد الاستلام.</span>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" id="btnSubmitScissor" class="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white py-4 rounded-2xl font-black text-lg shadow-lg hover:from-amber-600 hover:to-orange-700 active:scale-95 transition-all flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-paper-plane text-lg"></i> تأكيد وإرسال حركة المقصة
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Hidden Canvas for Image Preprocessing -->
+    <canvas id="ocrProcessCanvas" class="hidden"></canvas>
+
+    <!-- ==================== MODAL 2: DELIVERY CONFIRMATION ==================== -->
+    <div id="deliveryConfirmModal" class="modal">
+        <div class="bg-white rounded-[2.25rem] shadow-2xl p-6 sm:p-8 w-full max-w-sm transform transition-all relative overflow-hidden flex flex-col items-center text-center my-auto">
+            <div class="absolute -top-10 -right-10 w-32 h-32 bg-accent rounded-full filter blur-3xl opacity-20"></div>
+
+            <div class="w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-tr from-accent to-emerald-400 rounded-[1.75rem] flex items-center justify-center mb-4 shadow-glow-green relative z-10 rotate-3">
+                <i class="fa-solid fa-check-double text-4xl sm:text-5xl text-white -rotate-3"></i>
+            </div>
+            
+            <h2 class="text-2xl sm:text-3xl font-black text-primary mb-2 relative z-10">تأكيد التسليم</h2>
+            <div class="flex items-center justify-center gap-2 bg-slate-50 py-2 px-4 rounded-xl border border-slate-100 mb-5 relative z-10 w-full">
+                <span class="text-sm font-bold text-slate-500">رقم الأوردر:</span>
+                <span id="confirmOrderNum" class="text-secondary font-black text-xl tracking-wider"></span>
+            </div>
+
+            <div id="paymentArea" class="w-full mb-5 relative z-10"></div>
+
+            <div class="bg-slate-50 text-slate-600 p-3.5 rounded-2xl w-full text-xs font-bold mb-5 flex items-start gap-3 text-right border border-slate-100 relative z-10 shadow-sm">
+                <div class="w-8 h-8 rounded-full bg-white flex items-center justify-center shrink-0 shadow-sm text-secondary">
+                    <i class="fa-solid fa-location-crosshairs text-base"></i>
+                </div>
+                <span class="leading-relaxed mt-0.5">لحماية حقوقك، سيتم التقاط موقعك الجغرافي (GPS) وقت التسليم لإثبات تواجدك.</span>
+            </div>
+
+            <div class="flex flex-col gap-2.5 w-full relative z-10">
+                <button onclick="executeDelivery()" id="btnConfirmDelivery" class="w-full bg-primary text-white py-4 rounded-2xl font-black text-lg sm:text-xl shadow-[0_8px_20px_rgba(15,23,42,0.3)] hover:bg-slate-800 active:scale-95 transition-all flex justify-center items-center gap-2">
+                    <i class="fa-solid fa-check"></i> نعم، تم التوصيل بنجاح
+                </button>
+                <button onclick="closeDeliveryModal()" class="w-full bg-white border-2 border-slate-100 text-slate-600 py-3.5 rounded-2xl font-black text-base hover:bg-slate-50 hover:border-slate-200 active:scale-95 transition-all">تراجع</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== APPLICATION LOGIC ==================== -->
+    <script>
+        (function() {
+            'use strict';
+
+            // 1. Endpoint & Safe Math Helpers
+            const _p = "aHR0cHM6Ly9zdG9yeS02NDUyMC1kZWZhdWx0LXJ0ZGIuZmlyZWJhc2Vpby5jb20v";
+            const _getEndpoint = () => {
+                try { return atob(_p); } catch (e) { return 'https://story-64520-default-rtdb.firebaseio.com/'; }
+            };
+
+            function exactAdd(a, b) {
+                return Math.round(((Number(a) || 0) + (Number(b) || 0)) * 100) / 100;
+            }
+            function exactMul(a, b) {
+                return Math.round(((Number(a) || 0) * (Number(b) || 0)) * 100) / 100;
+            }
+            function roundMoney(val) {
+                return Math.round((Number(val) || 0) * 100) / 100;
+            }
+
+            function normalizeDigits(str) {
+                if (!str) return '';
+                const arabicNumbers = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+                return String(str).replace(/[٠-٩]/g, w => arabicNumbers.indexOf(w));
+            }
+
+            // تطبيع النصوص العربية لتسهيل البحث الدقيق (توحيد الألف والهاء والتاء المربوطة والياء)
+            function normalizeArabicSearch(text) {
+                if (!text) return '';
+                return normalizeDigits(String(text))
+                    .toLowerCase()
+                    .trim()
+                    .replace(/[أإآٱ]/g, 'ا')
+                    .replace(/ة/g, 'ه')
+                    .replace(/ى/g, 'ي')
+                    .replace(/[\u064B-\u065F]/g, '')
+                    .replace(/\s+/g, ' ');
+            }
+
+            function escapeHTML(str) {
+                if (str === null || str === undefined) return '';
+                return String(str)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            }
+
+            // 2. Smart Network Engine with Caching & Retries
+            const _inFlightRequests = new Map();
+            const _responseCache = new Map();
+
+            async function secureFetch(path, options = {}, cacheTTL = 0) {
+                const method = (options.method || 'GET').toUpperCase();
+                const url = `${_getEndpoint()}${path}`;
+                const cacheKey = `${method}:${path}`;
+
+                if (method === 'GET' && cacheTTL > 0 && _responseCache.has(cacheKey)) {
+                    const cached = _responseCache.get(cacheKey);
+                    if (Date.now() - cached.ts < cacheTTL) return cached.data;
+                }
+
+                if (method === 'GET' && _inFlightRequests.has(cacheKey)) {
+                    return _inFlightRequests.get(cacheKey);
+                }
+
+                const executeRequest = async (retries = 3) => {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+                    try {
+                        const fetchOpts = { ...options, signal: controller.signal };
+                        if (method !== 'GET') {
+                            fetchOpts.headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+                        }
+                        const res = await fetch(url, fetchOpts);
+                        clearTimeout(timeoutId);
+
+                        if (!res.ok) throw new Error(`HTTP_${res.status}`);
+                        const data = await res.json();
+
+                        if (method === 'GET' && cacheTTL > 0) {
+                            _responseCache.set(cacheKey, { ts: Date.now(), data });
+                        }
+                        if (method !== 'GET') {
+                            _responseCache.clear();
+                        }
+                        return data;
+                    } catch (err) {
+                        clearTimeout(timeoutId);
+                        if (retries > 0) {
+                            const backoff = (4 - retries) * 500 + Math.floor(Math.random() * 400);
+                            await new Promise(r => setTimeout(r, backoff));
+                            return executeRequest(retries - 1);
+                        }
+                        throw err;
+                    }
+                };
+
+                const promise = executeRequest().finally(() => _inFlightRequests.delete(cacheKey));
+                if (method === 'GET') _inFlightRequests.set(cacheKey, promise);
+                return promise;
+            }
+
+            // 3. Session Token Integrity
+            function createSessionToken(delObj) {
+                const payload = JSON.stringify(delObj);
+                let hash = 0;
+                const secret = payload + navigator.userAgent + getDeviceId();
+                for (let i = 0; i < secret.length; i++) {
+                    hash = ((hash << 5) - hash) + secret.charCodeAt(i);
+                    hash |= 0;
+                }
+                return btoa(encodeURIComponent(JSON.stringify({ d: delObj, s: hash })));
+            }
+
+            function verifySessionToken(token) {
+                try {
+                    const parsed = JSON.parse(decodeURIComponent(atob(token)));
+                    if (!parsed || !parsed.d || !parsed.s) return null;
+                    return createSessionToken(parsed.d) === token ? parsed.d : null;
+                } catch (e) { return null; }
+            }
+
+            // State Variables
+            let loginAttempts = 0;
+            let lockoutUntil = 0;
+            let currentDelegate = null;
+            let isDelegateActiveInSystem = false; // حالة اعتماد ووجود المندوب داخل المنظومة
+            let branchesCache = {};
+            let cashSettingsCache = null; 
+            let subRegionsCache = {};
+            let scissorsPricingCache = {};
+            let myOrders = [];
+            let orderToConfirm = null;
+            let knownOrderIds = new Set();
+            let isFirstLoad = true;
+            let activeInterval = null;
+            let isFetchingOrders = false;
+            let cameraStream = null;
+            let allRegionsList = [];
+            let fastOcrWorker = null;
+            let fastOcrReady = false;
+            let selectedScissorBranchObj = null;
+
+            async function initFastOcrWorker() {
+                if (fastOcrWorker || typeof Tesseract === 'undefined') return;
+                try {
+                    fastOcrWorker = await Tesseract.createWorker('eng', 1, {
+                        logger: m => {
+                            if (m.status === 'recognizing text') {
+                                const pct = Math.round((m.progress || 0) * 100);
+                                const progEl = document.getElementById('ocrProgressText');
+                                if (progEl) progEl.textContent = `جاري استخراج الأرقام والبيانات... ${pct}%`;
+                            }
+                        }
+                    });
+                    fastOcrReady = true;
+                } catch (e) {
+                    fastOcrWorker = null;
+                    fastOcrReady = false;
+                }
+            }
+            setTimeout(initFastOcrWorker, 1500);
+
+            function showToast(msg, type = 'success') {
+                const container = document.getElementById('toast-container');
+                const t = document.createElement('div');
+                t.className = `toast ${type}`;
+                const icon = type === 'success' ? 'fa-circle-check' : (type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-info');
+                t.innerHTML = `<div class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0"><i class="fa-solid ${icon} text-base"></i></div> <span class="leading-tight">${escapeHTML(msg)}</span>`;
+                container.appendChild(t);
+                setTimeout(() => t.remove(), 4000);
+            }
+
+            function generateUUID() {
+                if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+                return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+                    const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                    return v.toString(16);
+                });
+            }
+
+            function getDeviceId() {
+                let id = localStorage.getItem('scissors_delegate_device_id');
+                if(!id) {
+                    id = generateUUID();
+                    localStorage.setItem('scissors_delegate_device_id', id);
+                }
+                return id;
+            }
+
+            function getDeviceInfo() {
+                const ua = navigator.userAgent;
+                let os = "Unknown OS";
+                if(ua.includes("Android")) os = "Android Mobile";
+                else if(ua.includes("iPhone") || ua.includes("iPad")) os = "iOS Device";
+                return `Delegate App Pro - ${os}`;
+            }
+
+            function requestNotificationPermission() {
+                if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
+                    Notification.requestPermission();
+                }
+            }
+
+            function sendPushNotification(title, body) {
+                if ("Notification" in window && Notification.permission === "granted") {
+                    new Notification(title, { body, icon: "https://cdn-icons-png.flaticon.com/512/2830/2830305.png" });
+                }
+            }
+
+            function formatDateTimeLocal(dateObj) {
+                const y = dateObj.getFullYear();
+                const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+                const d = String(dateObj.getDate()).padStart(2, '0');
+                const h = String(dateObj.getHours()).padStart(2, '0');
+                const min = String(dateObj.getMinutes()).padStart(2, '0');
+                return `${y}-${m}-${d}T${h}:${min}`;
+            }
+
+            function getTodayDateStr() {
+                const now = new Date();
+                const y = now.getFullYear();
+                const m = String(now.getMonth() + 1).padStart(2, '0');
+                const d = String(now.getDate()).padStart(2, '0');
+                return `${y}-${m}-${d}`;
+            }
+
+            document.addEventListener('DOMContentLoaded', () => {
+                const now = new Date();
+                const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+                const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+                document.getElementById('repFromDate').value = formatDateTimeLocal(startOfDay);
+                document.getElementById('repToDate').value = formatDateTimeLocal(endOfDay);
+
+                // إغلاق قائمة البحث عن المناطق عند النقر خارجها
+                document.addEventListener('click', (e) => {
+                    const searchInput = document.getElementById('regionSearchInput');
+                    const resultsList = document.getElementById('regionSearchResultsList');
+                    if (searchInput && resultsList && !searchInput.contains(e.target) && !resultsList.contains(e.target)) {
+                        resultsList.classList.add('hidden');
+                    }
+                });
+
+                const savedToken = sessionStorage.getItem('scissorsDelegateSession');
+                if(savedToken) {
+                    const verifiedUser = verifySessionToken(savedToken);
+                    if (verifiedUser) {
+                        currentDelegate = verifiedUser;
+                        startApp();
+                    } else {
+                        sessionStorage.removeItem('scissorsDelegateSession');
+                    }
+                }
+            });
+
+            // ==================== SYSTEM MEMBERSHIP GUARD (التحقق من وجود واعتماد المندوب داخل المنظومة) ====================
+            function updateSystemRestrictionUI(allowed, reasonMsg = '') {
+                isDelegateActiveInSystem = allowed;
+                const banner = document.getElementById('systemRestrictionBanner');
+                const bannerText = document.getElementById('systemRestrictionText');
+                const headerBtns = document.getElementById('headerActionButtons');
+                const floatingBtns = document.getElementById('floatingActionButtons');
+                const emptyBtns = document.getElementById('emptyStateActionButtons');
+                const sideBtnOrder = document.getElementById('sideBtnOrder');
+                const sideBtnScissor = document.getElementById('sideBtnScissor');
+
+                if (allowed) {
+                    banner.classList.add('hidden');
+                    headerBtns.classList.remove('hidden');
+                    floatingBtns.classList.remove('hidden');
+                    emptyBtns.classList.remove('hidden');
+                    if (sideBtnOrder) sideBtnOrder.classList.remove('opacity-40', 'pointer-events-none');
+                    if (sideBtnScissor) sideBtnScissor.classList.remove('opacity-40', 'pointer-events-none');
+                } else {
+                    if (reasonMsg) bannerText.textContent = reasonMsg;
+                    banner.classList.remove('hidden');
+                    headerBtns.classList.add('hidden');
+                    floatingBtns.classList.add('hidden');
+                    emptyBtns.classList.add('hidden');
+                    if (sideBtnOrder) sideBtnOrder.classList.add('opacity-40', 'pointer-events-none');
+                    if (sideBtnScissor) sideBtnScissor.classList.add('opacity-40', 'pointer-events-none');
+                }
+            }
+
+            async function verifyDelegateSystemMembership(showFeedback = false) {
+                if (!currentDelegate || !currentDelegate.id) {
+                    updateSystemRestrictionUI(false, 'غير مسموح بالتسجيل: بيانات المندوب غير موجودة في المنظومة.');
+                    return false;
+                }
+
+                try {
+                    const devId = getDeviceId();
+                    const [delRecord, devRecord] = await Promise.all([
+                        secureFetch(`delegates/${currentDelegate.id}.json`, {}, 0),
+                        secureFetch(`devices/${devId}.json`, {}, 0)
+                    ]);
+
+                    // 1. التأكد من وجود المندوب فعلياً في قاعدة بيانات المنظومة وأنه غير محذوف أو موقوف
+                    if (!delRecord || typeof delRecord !== 'object' || !delRecord.code) {
+                        updateSystemRestrictionUI(false, 'تم إيقاف التسجيل: حساب المندوب غير مسجل أو تم حذفه من المنظومة.');
+                        if (showFeedback) showToast('حسابك غير مسجل داخل المنظومة!', 'error');
+                        return false;
+                    }
+
+                    const isBlockedOrInactive = (
+                        delRecord.active === false ||
+                        delRecord.isActive === false ||
+                        delRecord.status === 'blocked' ||
+                        delRecord.status === 'inactive' ||
+                        delRecord.status === 'suspended'
+                    );
+
+                    if (isBlockedOrInactive) {
+                        updateSystemRestrictionUI(false, 'تم إيقاف التسجيل: حساب المندوب موقوف حالياً من قبل الإدارة.');
+                        if (showFeedback) showToast('حسابك موقوف من الإدارة حالياً', 'error');
+                        return false;
+                    }
+
+                    // 2. التأكد من أن الجهاز معتمد (approved) داخل المنظومة
+                    if (!devRecord || devRecord.status !== 'approved') {
+                        const statusReason = (!devRecord || devRecord.status === 'pending')
+                            ? 'جهازك قيد المراجعة ولم يتم اعتماده داخل المنظومة بعد — لا يمكنك تسجيل أوردرات أو حركات.'
+                            : 'هذا الجهاز غير مصرح له بالعمل داخل المنظومة.';
+                        updateSystemRestrictionUI(false, statusReason);
+                        if (showFeedback) showToast('جهازك غير معتمد داخل المنظومة بعد', 'warning');
+                        return false;
+                    }
+
+                    // تحديث بيانات الفرع والاسم إن تغيرت من الإدارة
+                    if (delRecord.branchId && delRecord.branchId !== currentDelegate.branchId) {
+                        currentDelegate.branchId = delRecord.branchId;
+                        const branchName = branchesCache[currentDelegate.branchId] ? branchesCache[currentDelegate.branchId].name : 'الفرع الرئيسي';
+                        document.getElementById('branchNameDisplay').textContent = branchName;
+                    }
+
+                    updateSystemRestrictionUI(true);
+                    if (showFeedback) showToast('تم التحقق: حسابك وجهازك معتمدان داخل المنظومة بنجاح', 'success');
+                    return true;
+                } catch (e) {
+                    // في حالة انقطاع الشبكة اللحظي نحافظ على آخر حالة معروفة ولا نسمح بالتسجيل بدون تحقق
+                    if (showFeedback) showToast('تعذر الاتصال بالمنظومة للتحقق من الصلاحية', 'error');
+                    return isDelegateActiveInSystem;
+                }
+            }
+
+            // ==================== AUTHENTICATION ====================
+            window.handleLogin = async function(e) {
+                e.preventDefault();
+
+                if (Date.now() < lockoutUntil) {
+                    const secs = Math.ceil((lockoutUntil - Date.now()) / 1000);
+                    showToast(`تم حظر المحاولات مؤقتاً، انتظر ${secs} ثانية`, "error");
+                    return;
+                }
+
+                const code = normalizeDigits(document.getElementById('loginCode').value.trim());
+                const pass = document.getElementById('loginPass').value.trim();
+                
+                document.getElementById('loginFormContainer').classList.add('hidden');
+                document.getElementById('loginLoading').classList.remove('hidden');
+
+                const devId = getDeviceId();
+                const devInfo = getDeviceInfo();
+
+                try {
+                    const data = await secureFetch('delegates.json', {}, 10000) || {};
+                    const delegateId = Object.keys(data).find(k => String(data[k].code) === String(code) && String(data[k].password) === String(pass));
+
+                    if (!delegateId) {
+                        loginAttempts++;
+                        if (loginAttempts >= 5) {
+                            lockoutUntil = Date.now() + 60000;
+                            loginAttempts = 0;
+                        }
+                        showToast("كود المندوب أو كلمة المرور غير صحيحة", "error");
+                        document.getElementById('loginFormContainer').classList.remove('hidden');
+                        document.getElementById('loginLoading').classList.add('hidden');
+                        return;
+                    }
+
+                    const delRecord = data[delegateId];
+                    if (delRecord.active === false || delRecord.isActive === false || delRecord.status === 'blocked' || delRecord.status === 'inactive') {
+                        showToast("عذراً، هذا الحساب موقوف من المنظومة", "error");
+                        document.getElementById('loginFormContainer').classList.remove('hidden');
+                        document.getElementById('loginLoading').classList.add('hidden');
+                        return;
+                    }
+
+                    loginAttempts = 0;
+                    const devData = await secureFetch(`devices/${devId}.json`);
+
+                    if (!devData) {
+                        await secureFetch(`devices/${devId}.json`, {
+                            method: 'PUT',
+                            body: JSON.stringify({ status: 'pending', deviceInfo: devInfo, delegateCode: code, delegateName: delRecord.name || '', timestamp: Date.now() })
+                        });
+                        document.getElementById('loginLoading').classList.add('hidden');
+                        document.getElementById('loginPendingMsg').classList.remove('hidden');
+                        return;
+                    }
+
+                    if (devData.status === 'pending') {
+                        document.getElementById('loginLoading').classList.add('hidden');
+                        document.getElementById('loginPendingMsg').classList.remove('hidden');
+                        return;
+                    }
+
+                    if (devData.status === 'blocked' || devData.status !== 'approved') {
+                        document.getElementById('loginLoading').classList.add('hidden');
+                        document.getElementById('loginBlockedMsg').classList.remove('hidden');
+                        return;
+                    }
+
+                    currentDelegate = {
+                        id: delegateId,
+                        name: delRecord.name,
+                        code: delRecord.code,
+                        branchId: delRecord.branchId
+                    };
+                    
+                    sessionStorage.setItem('scissorsDelegateSession', createSessionToken(currentDelegate));
+                    startApp();
+
+                } catch (error) {
+                    showToast("خطأ في الاتصال، تأكد من جودة الإنترنت", "error");
+                    document.getElementById('loginFormContainer').classList.remove('hidden');
+                    document.getElementById('loginLoading').classList.add('hidden');
+                }
+            };
+
+            window.logout = function() {
+                stopCamera();
+                sessionStorage.removeItem('scissorsDelegateSession');
+                window.location.reload();
+            };
+
+            async function startApp() {
+                document.getElementById('loginScreen').classList.add('hidden');
+                document.getElementById('appContainer').classList.remove('hidden');
+                document.getElementById('appContainer').classList.add('flex');
+                
+                document.getElementById('delegateNameDisplay').textContent = currentDelegate.name;
+                document.getElementById('sideNameDisplay').textContent = currentDelegate.name;
+                document.getElementById('sideCodeDisplay').textContent = 'كود الموظف: ' + currentDelegate.code;
+                
+                requestNotificationPermission();
+
+                // التحقق الفوري من عضوية المندوب واعتماده داخل المنظومة
+                await verifyDelegateSystemMembership(false);
+
+                try {
+                    const [bData, csData, csAltData, srData, spData] = await Promise.all([
+                        secureFetch('branches.json', {}, 300000),
+                        secureFetch('cash_settings.json', {}, 300000).catch(() => null),
+                        secureFetch('cash-settings.json', {}, 300000).catch(() => null),
+                        secureFetch('regions/sub.json', {}, 300000).catch(() => null),
+                        secureFetch('scissorsPricing.json', {}, 300000).catch(() => null)
+                    ]);
+                    
+                    branchesCache = bData || {};
+                    cashSettingsCache = csData || csAltData;
+                    subRegionsCache = srData || {};
+                    scissorsPricingCache = spData || {};
+
+                    const branchName = branchesCache[currentDelegate.branchId] ? branchesCache[currentDelegate.branchId].name : 'الفرع الرئيسي';
+                    document.getElementById('branchNameDisplay').textContent = branchName;
+                    
+                    const branchSelect = document.getElementById('repBranchFilter');
+                    if(branchSelect) {
+                        branchSelect.innerHTML = '<option value="all">كل الحركات (جميع الفروع والأوردرات)</option>';
+                        Object.keys(branchesCache).forEach(k => {
+                            branchSelect.innerHTML += `<option value="${escapeHTML(k)}">${escapeHTML(branchesCache[k].name)}</option>`;
+                        });
+                    }
+
+                    prepareRegionsList();
+                } catch(e) {}
+
+                fetchMyOrders();
+
+                const randomJitter = Math.floor(Math.random() * 4000);
+                activeInterval = setInterval(() => {
+                    if (!document.hidden && document.getElementById('view-home').classList.contains('active')) {
+                        fetchMyOrders();
+                    }
+                }, 15000 + randomJitter);
+
+                document.addEventListener('visibilitychange', () => {
+                    if (!document.hidden && currentDelegate) {
+                        verifyDelegateSystemMembership(false);
+                        if (document.getElementById('view-home').classList.contains('active')) {
+                            fetchMyOrders();
+                        }
+                    }
+                });
+                
+                setInterval(async () => {
+                    if (document.hidden) return;
+                    await verifyDelegateSystemMembership(false);
+                    const currentDevId = getDeviceId();
+                    try {
+                        await secureFetch(`devices/${currentDevId}.json`, {
+                            method: 'PATCH',
+                            body: JSON.stringify({ lastSeen: Date.now() })
+                        });
+                    } catch(e) {}
+                }, 45000);
+            }
+
+            // ==================== REGIONS PREPARATION & SMART SEARCH ====================
+            function extractRegionsRecursively(node, inheritedBranchId = '', depth = 0) {
+                if (!node || typeof node !== 'object' || depth > 4) return;
+
+                const rawName = node.name || node.regionName || node.subRegionName || node.title || node.areaName || node.label;
+                if (rawName && typeof rawName === 'string' && rawName.trim().length > 0) {
+                    const name = rawName.trim();
+                    const branchId = node.branchId || node.parentBranchId || node.branch || inheritedBranchId || '';
+                    const branchName = (branchId && branchesCache[branchId]) ? (branchesCache[branchId].name || '') : '';
+                    const fee = roundMoney(
+                        node.delegatePrice ?? node.price ?? node.deliveryFee ?? node.fee ?? node.rate ?? node.cost ?? 0
+                    );
+                    const id = node.id || node.key || `${branchId}_${name}`;
+
+                    if (!allRegionsList.some(r => r.id === id && r.name === name)) {
+                        allRegionsList.push({
+                            id: String(id),
+                            name: name,
+                            normalizedName: normalizeArabicSearch(name),
+                            branchId: String(branchId),
+                            branchName: branchName,
+                            normalizedBranch: normalizeArabicSearch(branchName),
+                            fee: fee,
+                            isCurrentBranch: String(branchId) === String(currentDelegate?.branchId || '')
+                        });
+                    }
+                    return;
+                }
+
+                Object.keys(node).forEach(key => {
+                    const child = node[key];
+                    if (child && typeof child === 'object') {
+                        const childName = child.name || child.regionName || child.subRegionName || child.title || child.areaName || child.label;
+                        if (childName && typeof childName === 'string') {
+                            const name = childName.trim();
+                            const branchId = child.branchId || child.parentBranchId || child.branch || inheritedBranchId || '';
+                            const branchName = (branchId && branchesCache[branchId]) ? (branchesCache[branchId].name || '') : '';
+                            const fee = roundMoney(
+                                child.delegatePrice ?? child.price ?? child.deliveryFee ?? child.fee ?? child.rate ?? child.cost ?? 0
+                            );
+                            if (!allRegionsList.some(r => r.id === String(key) && r.name === name)) {
+                                allRegionsList.push({
+                                    id: String(key),
+                                    name: name,
+                                    normalizedName: normalizeArabicSearch(name),
+                                    branchId: String(branchId),
+                                    branchName: branchName,
+                                    normalizedBranch: normalizeArabicSearch(branchName),
+                                    fee: fee,
+                                    isCurrentBranch: String(branchId) === String(currentDelegate?.branchId || '')
+                                });
+                            }
+                        } else {
+                            const nextBranchId = branchesCache[key] ? key : inheritedBranchId;
+                            extractRegionsRecursively(child, nextBranchId, depth + 1);
+                        }
+                    } else if (typeof child === 'string' && child.trim().length > 1) {
+                        const name = child.trim();
+                        const branchName = (inheritedBranchId && branchesCache[inheritedBranchId]) ? branchesCache[inheritedBranchId].name : '';
+                        if (!allRegionsList.some(r => r.id === String(key))) {
+                            allRegionsList.push({
+                                id: String(key),
+                                name: name,
+                                normalizedName: normalizeArabicSearch(name),
+                                branchId: String(inheritedBranchId),
+                                branchName: branchName,
+                                normalizedBranch: normalizeArabicSearch(branchName),
+                                fee: 0,
+                                isCurrentBranch: String(inheritedBranchId) === String(currentDelegate?.branchId || '')
+                            });
+                        }
+                    }
+                });
+            }
+
+            async function ensureRegionsLoaded(forceFresh = false) {
+                if (allRegionsList.length > 0 && !forceFresh) return;
+                
+                allRegionsList = [];
+                try {
+                    const [srMainSub, srData, regData, areasData, brData, rpData] = await Promise.all([
+                        secureFetch('regions/sub.json', {}, forceFresh ? 0 : 60000).catch(() => null),
+                        secureFetch('subRegions.json', {}, forceFresh ? 0 : 60000).catch(() => null),
+                        secureFetch('regions.json', {}, forceFresh ? 0 : 60000).catch(() => null),
+                        secureFetch('areas.json', {}, forceFresh ? 0 : 60000).catch(() => null),
+                        Object.keys(branchesCache).length === 0 ? secureFetch('branches.json', {}, 60000).catch(() => null) : Promise.resolve(branchesCache),
+                        secureFetch('region_prices.json', {}, forceFresh ? 0 : 60000).catch(() => null)
+                    ]);
+
+                    if (brData && Object.keys(branchesCache).length === 0) {
+                        branchesCache = brData;
+                    }
+                    if (srMainSub) {
+                        subRegionsCache = srMainSub;
+                        extractRegionsRecursively(srMainSub);
+                    }
+                    if (allRegionsList.length === 0 && srData) {
+                        subRegionsCache = srData;
+                        extractRegionsRecursively(srData);
+                    }
+                    if (allRegionsList.length === 0 && regData) {
+                        subRegionsCache = regData;
+                        extractRegionsRecursively(regData);
+                    }
+                    if (allRegionsList.length === 0 && areasData) {
+                        subRegionsCache = areasData;
+                        extractRegionsRecursively(areasData);
+                    }
+                    if (allRegionsList.length === 0 && branchesCache) {
+                        Object.keys(branchesCache).forEach(bKey => {
+                            const bObj = branchesCache[bKey];
+                            if (bObj && bObj.subRegions) extractRegionsRecursively(bObj.subRegions, bKey);
+                            if (bObj && bObj.regions) extractRegionsRecursively(bObj.regions, bKey);
+                        });
+                    }
+
+                    const myBranchId = currentDelegate?.branchId || '';
+                    if (rpData && myBranchId && rpData[myBranchId]) {
+                        allRegionsList.forEach(reg => {
+                            if (rpData[myBranchId][reg.id] !== undefined) {
+                                reg.fee = roundMoney(rpData[myBranchId][reg.id]);
+                            }
+                        });
+                    }
+                } catch (e) {}
+
+                allRegionsList.sort((a, b) => {
+                    if (a.isCurrentBranch && !b.isCurrentBranch) return -1;
+                    if (!a.isCurrentBranch && b.isCurrentBranch) return 1;
+                    return a.name.localeCompare(b.name, 'ar');
+                });
+
+                renderRegionsDropdown(allRegionsList);
+            }
+
+            function prepareRegionsList() {
+                allRegionsList = [];
+                if (subRegionsCache && typeof subRegionsCache === 'object') {
+                    extractRegionsRecursively(subRegionsCache);
+                }
+                allRegionsList.sort((a, b) => {
+                    if (a.isCurrentBranch && !b.isCurrentBranch) return -1;
+                    if (!a.isCurrentBranch && b.isCurrentBranch) return 1;
+                    return a.name.localeCompare(b.name, 'ar');
+                });
+                renderRegionsDropdown(allRegionsList);
+            }
+
+            function renderRegionsDropdown(regionsArray) {
+                const select = document.getElementById('scanRegionSelect');
+                const hint = document.getElementById('regionsStatusHint');
+                if (!select) return;
+                
+                const currentVal = select.value;
+                let html = '<option value="">-- اختر المنطقة من القائمة --</option>';
+                
+                regionsArray.forEach(reg => {
+                    const branchTag = reg.branchName ? ` (${reg.branchName})` : '';
+                    const feeTag = reg.fee > 0 ? ` - توصيل: ${reg.fee} ج.م` : '';
+                    html += `<option value="${escapeHTML(reg.id)}" data-fee="${reg.fee}" data-name="${escapeHTML(reg.name)}">${escapeHTML(reg.name)}${escapeHTML(branchTag)}${escapeHTML(feeTag)}</option>`;
+                });
+                
+                select.innerHTML = html;
+                if (currentVal && regionsArray.some(r => String(r.id) === String(currentVal))) {
+                    select.value = currentVal;
+                }
+
+                if (hint) {
+                    if (allRegionsList.length === 0) {
+                        hint.textContent = 'تنبيه: لا توجد مناطق مسجلة في قاعدة البيانات حالياً.';
+                        hint.classList.remove('hidden');
+                    } else {
+                        hint.classList.add('hidden');
+                    }
+                }
+            }
+
+            function getFilteredRegionsByQuery(rawQuery) {
+                const normQuery = normalizeArabicSearch(rawQuery);
+                if (!normQuery) return allRegionsList;
+                const tokens = normQuery.split(' ').filter(Boolean);
+                return allRegionsList.filter(r => {
+                    const haystack = `${r.normalizedName} ${r.normalizedBranch}`;
+                    return tokens.every(tok => haystack.includes(tok));
+                });
+            }
+
+            window.handleRegionSearchInput = function() {
+                const input = document.getElementById('regionSearchInput');
+                const clearBtn = document.getElementById('clearRegionSearchBtn');
+                const rawVal = input.value;
+
+                if (rawVal.trim().length > 0) {
+                    clearBtn.classList.remove('hidden');
+                } else {
+                    clearBtn.classList.add('hidden');
+                }
+
+                const filtered = getFilteredRegionsByQuery(rawVal);
+                renderRegionsDropdown(filtered);
+                renderRegionSearchDropdownList(filtered, rawVal.trim());
+
+                // إذا كانت هناك نتيجة مطابقة واحدة فقط أثناء الكتابة، حددها تلقائياً في القائمة المنسدلة
+                const select = document.getElementById('scanRegionSelect');
+                if (filtered.length === 1 && rawVal.trim().length >= 2) {
+                    select.value = filtered[0].id;
+                    onRegionSelectChange(false);
+                }
+            };
+
+            window.openRegionSearchResults = function() {
+                const input = document.getElementById('regionSearchInput');
+                const filtered = getFilteredRegionsByQuery(input.value);
+                renderRegionSearchDropdownList(filtered, input.value.trim());
+            };
+
+            function renderRegionSearchDropdownList(items, queryText) {
+                const listEl = document.getElementById('regionSearchResultsList');
+                if (!listEl) return;
+
+                if (allRegionsList.length === 0) {
+                    listEl.classList.add('hidden');
+                    return;
+                }
+
+                if (items.length === 0) {
+                    listEl.innerHTML = `<div class="p-4 text-center text-xs font-black text-slate-400">لا توجد منطقة مطابقة لـ "${escapeHTML(queryText)}"</div>`;
+                    listEl.classList.remove('hidden');
+                    return;
+                }
+
+                const maxItems = items.slice(0, 30);
+                listEl.innerHTML = maxItems.map(reg => {
+                    const branchBadge = reg.branchName ? `<span class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md font-bold">${escapeHTML(reg.branchName)}</span>` : '';
+                    const feeBadge = reg.fee > 0 ? `<span class="text-[11px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">${reg.fee} ج.م</span>` : '';
+                    return `
+                        <button type="button" onclick="pickRegionFromSearch('${escapeHTML(reg.id)}')" class="w-full text-right px-4 py-3 hover:bg-indigo-50 active:bg-indigo-100 transition-colors flex items-center justify-between gap-2">
+                            <div class="flex flex-col gap-0.5 min-w-0">
+                                <span class="text-xs sm:text-sm font-black text-slate-800 truncate">${escapeHTML(reg.name)}</span>
+                                ${branchBadge}
+                            </div>
+                            ${feeBadge}
+                        </button>
+                    `;
+                }).join('');
+
+                listEl.classList.remove('hidden');
+            }
+
+            window.pickRegionFromSearch = function(regionId) {
+                const reg = allRegionsList.find(r => String(r.id) === String(regionId));
+                if (!reg) return;
+
+                // إعادة ملء القائمة المنسدلة بالكامل ثم تحديد المنطقة المختارة
+                renderRegionsDropdown(allRegionsList);
+                const select = document.getElementById('scanRegionSelect');
+                select.value = reg.id;
+
+                const searchInput = document.getElementById('regionSearchInput');
+                searchInput.value = reg.name;
+                document.getElementById('clearRegionSearchBtn').classList.remove('hidden');
+                document.getElementById('regionSearchResultsList').classList.add('hidden');
+
+                onRegionSelectChange(false);
+                if (navigator.vibrate) navigator.vibrate(30);
+            };
+
+            window.clearRegionSearch = function() {
+                const searchInput = document.getElementById('regionSearchInput');
+                searchInput.value = '';
+                document.getElementById('clearRegionSearchBtn').classList.add('hidden');
+                document.getElementById('regionSearchResultsList').classList.add('hidden');
+                renderRegionsDropdown(allRegionsList);
+                searchInput.focus();
+            };
+
+            window.onRegionSelectChange = function(syncSearchInput = true) {
+                const select = document.getElementById('scanRegionSelect');
+                const badge = document.getElementById('selectedRegionFeeBadge');
+                const selectedOption = select.options[select.selectedIndex];
+
+                if (selectedOption && selectedOption.value) {
+                    const fee = roundMoney(selectedOption.getAttribute('data-fee'));
+                    const regName = selectedOption.getAttribute('data-name') || '';
+                    badge.textContent = `التوصيل: ${fee} ج.م`;
+                    badge.classList.remove('hidden');
+
+                    if (syncSearchInput && regName) {
+                        document.getElementById('regionSearchInput').value = regName;
+                        document.getElementById('clearRegionSearchBtn').classList.remove('hidden');
+                    }
+                    document.getElementById('regionSearchResultsList').classList.add('hidden');
+                } else {
+                    badge.classList.add('hidden');
+                }
+                recalculateScannedOrderTotals();
+            };
+
+            window.recalculateScannedOrderTotals = function() {
+                const orderVal = roundMoney(document.getElementById('scanOrderValue').value);
+                const receiptCount = Math.max(1, parseInt(document.getElementById('scanReceiptCount').value, 10) || 1);
+                document.getElementById('scanTotalDisplay').textContent = orderVal.toFixed(2);
+                
+                const select = document.getElementById('scanRegionSelect');
+                const selectedOption = select.options[select.selectedIndex];
+                if (selectedOption && selectedOption.value) {
+                    const fee = roundMoney(selectedOption.getAttribute('data-fee'));
+                    const totalDelivery = exactMul(fee, receiptCount);
+                    document.getElementById('scanSummaryBreakdown').textContent = `الفاتورة (${orderVal} ج.م) | عدد الريسيت: ${receiptCount} | التوصيل: ${totalDelivery} ج.م`;
+                } else {
+                    document.getElementById('scanSummaryBreakdown').textContent = `صافي الفاتورة المطلوب تحصيله (عدد الريسيت: ${receiptCount})`;
+                }
+            };
+
+            // ==================== CAMERA & SMART OCR RECEIPT SCANNER ====================
+            window.openReceiptScannerModal = async function() {
+                // منع المندوب إذا لم يكن داخل المنظومة
+                const allowed = await verifyDelegateSystemMembership(true);
+                if (!allowed) {
+                    showToast('عذراً، لا يمكنك تسجيل أوردرات لأن حسابك أو جهازك غير معتمد داخل المنظومة', 'error');
+                    return;
+                }
+
+                resetScannerToCamera();
+                document.getElementById('receiptScannerModal').classList.add('active');
+                
+                initFastOcrWorker();
+                await ensureRegionsLoaded(true);
+            };
+
+            window.closeReceiptScannerModal = function() {
+                stopCamera();
+                document.getElementById('receiptScannerModal').classList.remove('active');
+            };
+
+            function stopCamera() {
+                if (cameraStream) {
+                    cameraStream.getTracks().forEach(track => track.stop());
+                    cameraStream = null;
+                }
+                const video = document.getElementById('cameraVideo');
+                if (video) video.srcObject = null;
+            }
+
+            async function startCameraStream() {
+                const video = document.getElementById('cameraVideo');
+                const fallback = document.getElementById('cameraFallbackMsg');
+                const guide = document.getElementById('cameraGuideOverlay');
+                const capturedImg = document.getElementById('capturedReceiptImg');
+
+                capturedImg.classList.add('hidden');
+                video.classList.remove('hidden');
+                fallback.classList.add('hidden');
+                guide.classList.remove('hidden');
+
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    video.classList.add('hidden');
+                    guide.classList.add('hidden');
+                    fallback.classList.remove('hidden');
+                    return;
+                }
+
+                try {
+                    stopCamera();
+                    cameraStream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            facingMode: { ideal: 'environment' },
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        },
+                        audio: false
+                    });
+                    video.srcObject = cameraStream;
+                    await video.play();
+                } catch (err) {
+                    video.classList.add('hidden');
+                    guide.classList.add('hidden');
+                    fallback.classList.remove('hidden');
+                }
+            }
+
+            window.resetScannerToCamera = function() {
+                document.getElementById('registerOrderForm').reset();
+                document.getElementById('scanReceiptCount').value = 1;
+                document.getElementById('regionSearchInput').value = '';
+                document.getElementById('clearRegionSearchBtn').classList.add('hidden');
+                document.getElementById('regionSearchResultsList').classList.add('hidden');
+                renderRegionsDropdown(allRegionsList);
+                document.getElementById('selectedRegionFeeBadge').classList.add('hidden');
+                document.getElementById('scanTotalDisplay').textContent = '0.00';
+
+                document.getElementById('registerOrderForm').classList.add('hidden');
+                document.getElementById('scannerStepCamera').classList.remove('hidden');
+                document.getElementById('ocrLoadingOverlay').classList.add('hidden');
+                document.getElementById('btnCapturePhoto').disabled = false;
+
+                startCameraStream();
+            };
+
+            window.skipToManualEntry = async function() {
+                stopCamera();
+                await ensureRegionsLoaded(false);
+                document.getElementById('scanReceiptCount').value = 1;
+                document.getElementById('scannerStepCamera').classList.add('hidden');
+                document.getElementById('registerOrderForm').classList.remove('hidden');
+                document.getElementById('scanResultBadge').textContent = 'إدخال يدوي - أدخل البيانات واختر المنطقة';
+                document.getElementById('scanOrderNumber').focus();
+            };
+
+            window.captureAndProcessReceipt = async function() {
+                const video = document.getElementById('cameraVideo');
+                if (!cameraStream || video.readyState < 2) {
+                    document.getElementById('receiptFileInput').click();
+                    return;
+                }
+
+                const canvas = document.getElementById('ocrProcessCanvas');
+                canvas.width = video.videoWidth || 1080;
+                canvas.height = video.videoHeight || 1440;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                const imageDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+                stopCamera();
+
+                await runOCRPipeline(canvas, imageDataUrl);
+            };
+
+            window.handleFileUploadReceipt = function(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                stopCamera();
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.onload = async function() {
+                        const canvas = document.getElementById('ocrProcessCanvas');
+                        const maxDim = 1100;
+                        let w = img.width;
+                        let h = img.height;
+                        if (w > maxDim || h > maxDim) {
+                            if (w > h) { h = Math.round(h * (maxDim / w)); w = maxDim; }
+                            else { w = Math.round(w * (maxDim / h)); h = maxDim; }
+                        }
+                        canvas.width = w;
+                        canvas.height = h;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, w, h);
+                        await runOCRPipeline(canvas, e.target.result);
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+                event.target.value = '';
+            };
+
+            function preprocessReceiptCanvas(sourceCanvas) {
+                const maxDim = 1100;
+                let w = sourceCanvas.width;
+                let h = sourceCanvas.height;
+                if (w > maxDim || h > maxDim) {
+                    if (w > h) { h = Math.round(h * (maxDim / w)); w = maxDim; }
+                    else { w = Math.round(w * (maxDim / h)); h = maxDim; }
+                }
+
+                const procCanvas = document.createElement('canvas');
+                procCanvas.width = w;
+                procCanvas.height = h;
+                const ctx = procCanvas.getContext('2d', { willReadFrequently: true });
+                ctx.drawImage(sourceCanvas, 0, 0, w, h);
+
+                const imgData = ctx.getImageData(0, 0, w, h);
+                const data = imgData.data;
+
+                const contrast = 1.65;
+                const intercept = 128 * (1 - contrast);
+
+                for (let i = 0; i < data.length; i += 4) {
+                    const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+                    let adjusted = lum * contrast + intercept;
+                    adjusted = adjusted < 0 ? 0 : (adjusted > 255 ? 255 : adjusted);
+                    data[i] = adjusted;
+                    data[i + 1] = adjusted;
+                    data[i + 2] = adjusted;
+                }
+                ctx.putImageData(imgData, 0, 0);
+                return procCanvas;
+            }
+
+            async function runOCRPipeline(rawCanvas, previewDataUrl) {
+                const previewImg = document.getElementById('capturedReceiptImg');
+                previewImg.src = previewDataUrl;
+                previewImg.classList.remove('hidden');
+                document.getElementById('cameraVideo').classList.add('hidden');
+                document.getElementById('cameraGuideOverlay').classList.add('hidden');
+                document.getElementById('cameraFallbackMsg').classList.add('hidden');
+                document.getElementById('ocrLoadingOverlay').classList.remove('hidden');
+                document.getElementById('ocrStatusText').textContent = 'قراءة فائقة السرعة للريسيت...';
+                document.getElementById('ocrProgressText').textContent = 'استخراج رقم الأوردر والقيمة';
+                document.getElementById('btnCapturePhoto').disabled = true;
+
+                try {
+                    const enhancedCanvas = preprocessReceiptCanvas(rawCanvas);
+
+                    if (typeof Tesseract === 'undefined') {
+                        throw new Error('OCR Engine not loaded');
+                    }
+
+                    let rawText = '';
+                    if (fastOcrReady && fastOcrWorker) {
+                        const result = await fastOcrWorker.recognize(enhancedCanvas);
+                        rawText = result.data.text || '';
+                    } else {
+                        const result = await Tesseract.recognize(enhancedCanvas, 'eng', {
+                            logger: m => {
+                                if (m.status === 'recognizing text') {
+                                    const pct = Math.round((m.progress || 0) * 100);
+                                    document.getElementById('ocrProgressText').textContent = `جاري التحليل... ${pct}%`;
+                                }
+                            }
+                        });
+                        rawText = result.data.text || '';
+                    }
+
+                    const parsed = parseReceiptText(rawText);
+
+                    document.getElementById('scanOrderNumber').value = parsed.orderNumber || '';
+                    document.getElementById('scanOrderValue').value = parsed.orderValue !== null ? parsed.orderValue : '';
+                    document.getElementById('scanReceiptCount').value = 1;
+                    document.getElementById('scanCustomerPhone').value = parsed.phone || '';
+                    document.getElementById('scanCustomerAddress').value = parsed.address || '';
+                    
+                    recalculateScannedOrderTotals();
+                    await ensureRegionsLoaded(false);
+
+                    if (parsed.address) {
+                        autoMatchRegionFromAddress(parsed.address);
+                    }
+
+                    document.getElementById('ocrLoadingOverlay').classList.add('hidden');
+                    document.getElementById('scannerStepCamera').classList.add('hidden');
+                    document.getElementById('registerOrderForm').classList.remove('hidden');
+
+                    if (parsed.orderNumber || parsed.orderValue !== null) {
+                        document.getElementById('scanResultBadge').textContent = 'تم استخراج البيانات بسرعة - اختر المنطقة';
+                        showToast('تمت قراءة الريسيت بنجاح!', 'success');
+                        if (navigator.vibrate) navigator.vibrate(100);
+                    } else {
+                        document.getElementById('scanResultBadge').textContent = 'يرجى تأكيد رقم الأوردر والقيمة واختيار المنطقة';
+                        showToast('يرجى مراجعة رقم الأوردر والقيمة يدوياً', 'warning');
+                    }
+
+                } catch (err) {
+                    await ensureRegionsLoaded(false);
+                    document.getElementById('scanReceiptCount').value = 1;
+                    document.getElementById('ocrLoadingOverlay').classList.add('hidden');
+                    document.getElementById('scannerStepCamera').classList.add('hidden');
+                    document.getElementById('registerOrderForm').classList.remove('hidden');
+                    document.getElementById('scanResultBadge').textContent = 'أدخل بيانات الفاتورة واختر المنطقة';
+                    showToast('تعذرت القراءة التلقائية، يمكنك الإدخال اليدوي', 'warning');
+                }
+            }
+
+            function parseReceiptText(rawText) {
+                const cleanText = normalizeDigits(rawText);
+                const lines = cleanText.split('\n').map(l => l.trim()).filter(Boolean);
+
+                let orderNumber = '';
+                let orderValue = null;
+                let phone = '';
+                let address = '';
+
+                const sinvMatch = cleanText.match(/(?:ACC[-\s]*SINV|SINV)[-\s]*[A-Za-z0-9]*[-\s]*(\d{4,10})/i);
+                if (sinvMatch && sinvMatch[1]) {
+                    orderNumber = sinvMatch[1];
+                }
+
+                if (!orderNumber) {
+                    const allCandidates = cleanText.match(/\b\d{5,8}\b/g) || [];
+                    const validCandidate = allCandidates.find(num => 
+                        num !== '16200' && 
+                        !num.startsWith('01') && 
+                        !num.startsWith('202')
+                    );
+                    if (validCandidate) {
+                        orderNumber = validCandidate;
+                    }
+                }
+
+                const decimalMatches = [];
+                for (const line of lines) {
+                    if (/\d{1,2}\/\d{1,2}\/\d{2,4}|\d{1,2}:\d{2}/.test(line)) continue;
+                    const matches = line.match(/\b(\d{1,5}\.\d{2})\b/g);
+                    if (matches) {
+                        matches.forEach(m => {
+                            const val = roundMoney(m);
+                            if (val > 0) decimalMatches.push(val);
+                        });
+                    }
+                }
+
+                if (decimalMatches.length > 0) {
+                    const counts = {};
+                    let repeatedMax = null;
+                    for (const v of decimalMatches) {
+                        counts[v] = (counts[v] || 0) + 1;
+                        if (counts[v] >= 2 && (repeatedMax === null || v > repeatedMax)) {
+                            repeatedMax = v;
+                        }
+                    }
+                    orderValue = repeatedMax !== null ? repeatedMax : Math.max(...decimalMatches);
+                }
+
+                const phoneMatch = cleanText.match(/(?:01[0125]\d{8})/);
+                if (phoneMatch) {
+                    phone = phoneMatch[0];
+                }
+
+                return { orderNumber, orderValue, phone, address };
+            }
+
+            function autoMatchRegionFromAddress(addressText) {
+                if (!addressText || allRegionsList.length === 0) return;
+                const normAddr = normalizeArabicSearch(addressText);
+                
+                const matched = allRegionsList.find(r => {
+                    const cleanRegName = r.normalizedName.replace(/^(م\.|مدينه|حي|منطقه)\s*/g, '').trim();
+                    return cleanRegName.length >= 3 && normAddr.includes(cleanRegName);
+                });
+
+                if (matched) {
+                    pickRegionFromSearch(matched.id);
+                }
+            }
+
+            // ==================== STRICT DUPLICATE CHECK & SUBMIT ORDER ====================
+            async function checkOrderExistsInDatabase(orderNum) {
+                const targetNum = String(orderNum).trim();
+                
+                if (myOrders.some(o => String(o.orderNumber).trim() === targetNum)) {
+                    return { exists: true, info: 'مسجل بالفعل في أوردراتك المعلقة الحالية' };
+                }
+
+                const datesToCheck = [];
+                for (let i = 0; i < 3; i++) {
+                    const d = new Date();
+                    d.setDate(d.getDate() - i);
+                    const y = d.getFullYear();
+                    const m = String(d.getMonth() + 1).padStart(2, '0');
+                    const day = String(d.getDate()).padStart(2, '0');
+                    datesToCheck.push(`${y}-${m}-${day}`);
+                }
+
+                const results = await Promise.all(
+                    datesToCheck.map(dateStr => secureFetch(`daily_records/${dateStr}.json`, {}, 0).catch(() => null))
+                );
+
+                for (let i = 0; i < results.length; i++) {
+                    const dayData = results[i];
+                    if (!dayData || typeof dayData !== 'object') continue;
+
+                    for (const branchKey of Object.keys(dayData)) {
+                        const branchRecords = dayData[branchKey];
+                        if (!branchRecords || typeof branchRecords !== 'object') continue;
+
+                        for (const recKey of Object.keys(branchRecords)) {
+                            const rec = branchRecords[recKey];
+                            if (!rec || typeof rec !== 'object') continue;
+
+                            const isCancelled = rec.status && String(rec.status).toLowerCase().includes('cancel');
+                            if (!isCancelled && rec.orderNumber && String(rec.orderNumber).trim() === targetNum) {
+                                const delName = rec.delegateName ? `بواسطة (${rec.delegateName})` : '';
+                                const dateLabel = datesToCheck[i] === getTodayDateStr() ? 'اليوم' : `بتاريخ ${datesToCheck[i]}`;
+                                return {
+                                    exists: true,
+                                    info: `رقم الأوردر #${targetNum} مسجل مسبقاً ${dateLabel} ${delName}`
+                                };
+                            }
+                        }
+                    }
+                }
+
+                return { exists: false };
+            }
+
+            window.submitScannedOrder = async function(e) {
+                e.preventDefault();
+
+                // فحص أمني إلزامي: منع التسجيل إذا لم يكن المندوب داخل المنظومة
+                const isVerifiedMember = await verifyDelegateSystemMembership(false);
+                if (!isVerifiedMember) {
+                    showToast('ممنوع التسجيل! حسابك أو جهازك غير معتمد داخل المنظومة', 'error');
+                    closeReceiptScannerModal();
+                    return;
+                }
+
+                const orderNumber = normalizeDigits(document.getElementById('scanOrderNumber').value.trim());
+                const orderValue = roundMoney(document.getElementById('scanOrderValue').value);
+                const receiptCount = Math.max(1, parseInt(normalizeDigits(document.getElementById('scanReceiptCount').value), 10) || 1);
+                const regionSelect = document.getElementById('scanRegionSelect');
+                const selectedRegionId = regionSelect.value;
+                const paymentMethod = document.getElementById('scanPaymentMethod').value || 'نقدي';
+                const customerPhone = normalizeDigits(document.getElementById('scanCustomerPhone').value.trim());
+                const customerAddress = document.getElementById('scanCustomerAddress').value.trim();
+
+                if (!orderNumber) {
+                    showToast('يرجى إدخال رقم الأوردر', 'error');
+                    return;
+                }
+                if (isNaN(orderValue) || orderValue < 0) {
+                    showToast('يرجى إدخال قيمة صحيحة للأوردر', 'error');
+                    return;
+                }
+                if (!selectedRegionId) {
+                    showToast('يجب اختيار المنطقة التي ستتحرك إليها', 'warning');
+                    document.getElementById('regionSearchInput').focus();
+                    return;
+                }
+
+                const btn = document.getElementById('btnSubmitScannedOrder');
+                const origHtml = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-shield-halved fa-fade text-xl"></i> جاري التحقق من رقم الأوردر...';
+
+                try {
+                    const dupCheck = await checkOrderExistsInDatabase(orderNumber);
+                    if (dupCheck.exists) {
+                        showToast(`مرفوض! ${dupCheck.info}`, 'error');
+                        if (navigator.vibrate) navigator.vibrate([150, 80, 150]);
+                        btn.disabled = false;
+                        btn.innerHTML = origHtml;
+                        return;
+                    }
+
+                    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-xl"></i> جاري التسجيل في القاعدة...';
+
+                    const selectedOption = regionSelect.options[regionSelect.selectedIndex];
+                    const regionName = selectedOption ? selectedOption.getAttribute('data-name') : '';
+                    const deliveryFee = selectedOption ? roundMoney(selectedOption.getAttribute('data-fee')) : 0;
+
+                    const todayStr = getTodayDateStr();
+                    const targetBranchId = currentDelegate.branchId || 'main';
+                    const nowTs = Date.now();
+
+                    const newOrderPayload = {
+                        orderNumber: orderNumber,
+                        orderValue: orderValue,
+                        changeAmount: 0,
+                        paymentMethod: paymentMethod,
+                        delegateId: currentDelegate.id,
+                        delegateName: currentDelegate.name,
+                        delegateCode: currentDelegate.code,
+                        branchId: targetBranchId,
+                        sourceBranchId: targetBranchId,
+                        subRegionId: selectedRegionId,
+                        subRegionName: regionName,
+                        customerRegion: regionName,
+                        deliveryFee: deliveryFee,
+                        regionPrice: deliveryFee,
+                        customerPhone: customerPhone,
+                        customerAddress: customerAddress,
+                        status: 'preparing',
+                        awaitingBranchApproval: true,
+                        branchApproved: false,
+                        delegateConfirmed: false,
+                        source: 'delegate_camera_scan',
+                        timestamp: nowTs,
+                        createdAt: nowTs,
+                        quantity: receiptCount,
+                        receiptCount: receiptCount
+                    };
+
+                    const res = await secureFetch(`daily_records/${todayStr}/${targetBranchId}.json`, {
+                        method: 'POST',
+                        body: JSON.stringify(newOrderPayload)
+                    });
+
+                    if (res && res.name) {
+                        knownOrderIds.add(res.name);
+                    }
+
+                    showToast(`تم تسجيل الأوردر #${orderNumber} (${receiptCount} ريسيت) وإرساله لاعتماد الفرع!`, 'success');
+                    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+
+                    closeReceiptScannerModal();
+                    
+                    if (!document.getElementById('view-home').classList.contains('active')) {
+                        document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+                        document.getElementById('view-home').classList.add('active');
+                        document.getElementById('headerStats').classList.remove('hidden');
+                        document.getElementById('headerStats').classList.add('flex');
+                    }
+                    
+                    await fetchMyOrders(true);
+
+                } catch (err) {
+                    showToast('حدث خطأ أثناء التحقق أو الحفظ، تأكد من الإنترنت', 'error');
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = origHtml;
+                }
+            };
+
+            // ==================== SCISSOR MOVEMENT (تسجيل مقصة - مبسط بدون عدد حركات أو ملاحظات) ====================
+            function getScissorUnitRate(fromBranchId, toBranchId) {
+                let rate = 0;
+                if (scissorsPricingCache && typeof scissorsPricingCache === 'object') {
+                    const key1 = `${fromBranchId}_${toBranchId}`;
+                    const key2 = `${fromBranchId}-${toBranchId}`;
+                    if (scissorsPricingCache[key1] !== undefined) {
+                        const obj = scissorsPricingCache[key1];
+                        rate = typeof obj === 'object' ? Number(obj.delegatePrice ?? obj.price ?? 0) : Number(obj);
+                    } else if (scissorsPricingCache[key2] !== undefined) {
+                        const obj = scissorsPricingCache[key2];
+                        rate = typeof obj === 'object' ? Number(obj.delegatePrice ?? obj.price ?? 0) : Number(obj);
+                    } else {
+                        const found = Object.values(scissorsPricingCache).find(sp =>
+                            sp && typeof sp === 'object' &&
+                            String(sp.fromBranch) === String(fromBranchId) &&
+                            String(sp.toBranch) === String(toBranchId)
+                        );
+                        if (found) {
+                            rate = Number(found.delegatePrice ?? found.price ?? 0);
+                        }
+                    }
+                }
+
+                if (!rate || isNaN(rate)) {
+                    if (cashSettingsCache !== null) {
+                        if (typeof cashSettingsCache === 'number') rate = cashSettingsCache;
+                        else if (typeof cashSettingsCache === 'object') {
+                            if (cashSettingsCache[fromBranchId] && typeof cashSettingsCache[fromBranchId] === 'object' && cashSettingsCache[fromBranchId][toBranchId] !== undefined) {
+                                rate = Number(cashSettingsCache[fromBranchId][toBranchId]);
+                            } else {
+                                rate = Number(cashSettingsCache[toBranchId] ?? cashSettingsCache.movementPrice ?? cashSettingsCache.delegateRate ?? cashSettingsCache.price ?? 1);
+                            }
+                        }
+                    } else {
+                        rate = 1;
+                    }
+                }
+                return roundMoney(rate);
+            }
+
+            window.openScissorModal = async function() {
+                // منع المندوب إذا لم يكن داخل المنظومة
+                const allowed = await verifyDelegateSystemMembership(true);
+                if (!allowed) {
+                    showToast('عذراً، لا يمكنك تسجيل حركات لأن حسابك أو جهازك غير معتمد داخل المنظومة', 'error');
+                    return;
+                }
+
+                if (Object.keys(branchesCache).length === 0) {
+                    try {
+                        const bData = await secureFetch('branches.json', {}, 60000);
+                        branchesCache = bData || {};
+                    } catch (e) {}
+                }
+
+                const fromBranchId = currentDelegate.branchId || '';
+                const fromBranchName = (fromBranchId && branchesCache[fromBranchId]) ? branchesCache[fromBranchId].name : 'الفرع الرئيسي';
+                document.getElementById('scissorFromBranchName').textContent = fromBranchName;
+
+                selectedScissorBranchObj = null;
+                document.getElementById('scissorToBranchSelect').value = '';
+                document.getElementById('selectedScissorBranchBadge').classList.add('hidden');
+                document.getElementById('registerScissorForm').reset();
+
+                renderScissorBranchButtons();
+                document.getElementById('scissorRegisterModal').classList.add('active');
+            };
+
+            function renderScissorBranchButtons() {
+                const grid = document.getElementById('scissorBranchesButtonsGrid');
+                if (!grid) return;
+
+                const fromBranchId = String(currentDelegate.branchId || '');
+                const selectedId = document.getElementById('scissorToBranchSelect').value;
+                let html = '';
+                let count = 0;
+
+                Object.keys(branchesCache).forEach(bKey => {
+                    const branchObj = branchesCache[bKey];
+                    if (!branchObj) return;
+                    const bName = String(branchObj.name || bKey).trim();
+
+                    const isCurrentBranch = (String(bKey) === fromBranchId);
+                    const isOrderBranch = bName.includes('اوردار') || bName.includes('أوردر') || bName.includes('اوردر');
+                    if (isCurrentBranch || isOrderBranch) return;
+
+                    count++;
+                    const isSelected = (String(bKey) === String(selectedId));
+                    const btnClasses = isSelected
+                        ? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white border-amber-600 shadow-md scale-[0.99]'
+                        : 'bg-white hover:bg-amber-50 text-slate-800 border-amber-200 hover:border-amber-400 shadow-sm';
+                    const iconClasses = isSelected ? 'text-white' : 'text-amber-600';
+
+                    html += `
+                        <button type="button" onclick="selectScissorBranchButton('${escapeHTML(bKey)}')" class="${btnClasses} border-2 rounded-2xl p-3.5 flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 text-center min-h-[76px]">
+                            <i class="fa-solid fa-store ${iconClasses} text-lg"></i>
+                            <span class="font-black text-xs sm:text-sm leading-tight">${escapeHTML(bName)}</span>
+                        </button>
+                    `;
+                });
+
+                if (count === 0) {
+                    html = '<div class="col-span-2 text-center py-6 text-xs font-bold text-amber-800 bg-white rounded-xl border border-amber-200">لا توجد فروع أخرى متاحة للتحويل إليها حالياً</div>';
+                }
+
+                grid.innerHTML = html;
+            }
+
+            window.selectScissorBranchButton = function(branchId) {
+                const branchObj = branchesCache[branchId];
+                if (!branchObj) return;
+
+                const fromBranchId = currentDelegate.branchId || '';
+                const bName = String(branchObj.name || branchId).trim();
+                const rate = getScissorUnitRate(fromBranchId, branchId);
+
+                selectedScissorBranchObj = {
+                    id: branchId,
+                    name: bName,
+                    rate: rate
+                };
+
+                document.getElementById('scissorToBranchSelect').value = branchId;
+                const badge = document.getElementById('selectedScissorBranchBadge');
+                badge.textContent = `الوجهة: ${bName}`;
+                badge.classList.remove('hidden');
+
+                if (navigator.vibrate) navigator.vibrate(40);
+                renderScissorBranchButtons();
+            };
+
+            window.closeScissorModal = function() {
+                document.getElementById('scissorRegisterModal').classList.remove('active');
+            };
+
+            window.submitScissorMovement = async function(e) {
+                e.preventDefault();
+
+                // فحص أمني إلزامي: منع تسجيل الحركة إذا لم يكن المندوب داخل المنظومة
+                const isVerifiedMember = await verifyDelegateSystemMembership(false);
+                if (!isVerifiedMember) {
+                    showToast('ممنوع التسجيل! حسابك أو جهازك غير معتمد داخل المنظومة', 'error');
+                    closeScissorModal();
+                    return;
+                }
+
+                const toBranchId = document.getElementById('scissorToBranchSelect').value;
+
+                if (!toBranchId || !selectedScissorBranchObj) {
+                    showToast('يرجى الضغط على زر الفرع المتجه إليه أولاً', 'warning');
+                    return;
+                }
+
+                const toBranchName = selectedScissorBranchObj.name;
+                const unitRate = selectedScissorBranchObj.rate;
+                const fromBranchId = currentDelegate.branchId || 'main';
+                const fromBranchName = (fromBranchId && branchesCache[fromBranchId]) ? branchesCache[fromBranchId].name : 'الفرع الرئيسي';
+
+                const btn = document.getElementById('btnSubmitScissor');
+                const origHtml = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-xl"></i> جاري تسجيل المقصة...';
+
+                const todayStr = getTodayDateStr();
+                const nowTs = Date.now();
+                const detailsTitle = `مقصة إلى ${toBranchName}`;
+
+                const scissorPayload = {
+                    type: 'scissor',
+                    movementType: 'scissor',
+                    isScissor: true,
+                    delegateId: currentDelegate.id,
+                    delegateName: currentDelegate.name,
+                    delegateCode: currentDelegate.code,
+                    branchId: fromBranchId,
+                    sourceBranchId: fromBranchId,
+                    fromBranch: fromBranchId,
+                    fromBranchName: fromBranchName,
+                    toBranch: toBranchId,
+                    toBranchName: toBranchName,
+                    details: detailsTitle,
+                    movementName: detailsTitle,
+                    notes: '',
+                    quantity: 1,
+                    movementPrice: unitRate,
+                    settlementPrice: unitRate,
+                    delegatePrice: unitRate,
+                    status: 'pending',
+                    awaitingBranchApproval: true,
+                    branchApproved: false,
+                    branchConfirmed: false,
+                    delegateConfirmed: false,
+                    source: 'delegate_app_scissor',
+                    timestamp: nowTs,
+                    createdAt: nowTs
+                };
+
+                try {
+                    const res = await secureFetch(`daily_records/${todayStr}/${fromBranchId}.json`, {
+                        method: 'POST',
+                        body: JSON.stringify(scissorPayload)
+                    });
+
+                    if (res && res.name) {
+                        knownOrderIds.add(res.name);
+                    }
+
+                    showToast(`تم تسجيل المقصة إلى (${toBranchName}) بنجاح وبانتظار تأكيد الفرع!`, 'success');
+                    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+
+                    closeScissorModal();
+
+                    if (!document.getElementById('view-home').classList.contains('active')) {
+                        document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+                        document.getElementById('view-home').classList.add('active');
+                        document.getElementById('headerStats').classList.remove('hidden');
+                        document.getElementById('headerStats').classList.add('flex');
+                    }
+
+                    await fetchMyOrders(true);
+                } catch (err) {
+                    showToast('تعذر تسجيل المقصة، تأكد من اتصال الإنترنت', 'error');
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = origHtml;
+                }
+            };
+
+            // ==================== NAVIGATION & SIDEBAR ====================
+            window.toggleSidebar = function() {
+                const menu = document.getElementById('sidebarMenu');
+                const overlay = document.getElementById('sidebarOverlay');
+                
+                if (menu.classList.contains('translate-x-full')) {
+                    menu.classList.remove('translate-x-full');
+                    overlay.classList.remove('hidden');
+                    void overlay.offsetWidth;
+                    overlay.classList.remove('opacity-0');
+                } else {
+                    menu.classList.add('translate-x-full');
+                    overlay.classList.add('opacity-0');
+                    setTimeout(() => overlay.classList.add('hidden'), 300);
+                }
+            };
+
+            window.switchView = function(viewName) {
+                document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+                document.getElementById(`view-${viewName}`).classList.add('active');
+                
+                if(viewName === 'home') {
+                    document.getElementById('headerStats').classList.remove('hidden');
+                    document.getElementById('headerStats').classList.add('flex');
+                    fetchMyOrders();
+                } else {
+                    document.getElementById('headerStats').classList.add('hidden');
+                    document.getElementById('headerStats').classList.remove('flex');
+                }
+
+                toggleSidebar();
+            };
+
+            // ==================== FETCH & RENDER PENDING ORDERS ====================
+            window.fetchMyOrders = async function(forceFresh = false) {
+                if (isFetchingOrders) return;
+                isFetchingOrders = true;
+
+                const loading = document.getElementById('ordersLoading');
+                if (myOrders.length === 0 && document.getElementById('view-home').classList.contains('active')) {
+                    loading.classList.remove('hidden');
+                }
+
+                const datesToFetch = [];
+                for(let i = 0; i < 2; i++) {
+                    const d = new Date();
+                    d.setDate(d.getDate() - i);
+                    const y = d.getFullYear();
+                    const m = String(d.getMonth() + 1).padStart(2, '0');
+                    const day = String(d.getDate()).padStart(2, '0');
+                    datesToFetch.push(`${y}-${m}-${day}`);
+                }
+
+                let fetchedOrders = [];
+                let pendingCount = 0; 
+                let totalTodayOrders = 0; 
+                let totalCashCollected = 0; 
+                let hasNewOrder = false; 
+
+                const todayStr = getTodayDateStr();
+                const cacheDuration = forceFresh ? 0 : 3000;
+
+                try {
+                    const results = await Promise.all(datesToFetch.map(d => secureFetch(`daily_records/${d}.json`, {}, cacheDuration)));
+                    
+                    results.forEach((dayData, index) => {
+                        if(dayData) {
+                            const dateStr = datesToFetch[index];
+                            Object.keys(dayData).forEach(branchKey => {
+                                const branchOrders = dayData[branchKey];
+                                if (branchOrders && typeof branchOrders === 'object') {
+                                    Object.keys(branchOrders).forEach(k => {
+                                        const r = branchOrders[k];
+                                        if (!r || typeof r !== 'object') return;
+                                        
+                                        const isMyDirectTask = (String(r.delegateId) === String(currentDelegate.id));
+                                        const isCancelled = r.status && String(r.status).toLowerCase().includes('cancel');
+
+                                        if (dateStr === todayStr && isMyDirectTask && !isCancelled) {
+                                            const qty = Number(r.receiptCount) || Number(r.quantity) || Number(r.count) || Number(r.qty) || 1;
+                                            totalTodayOrders += qty; 
+                                        }
+
+                                        const isCustomerOrder = !!r.orderNumber;
+                                        const isScissorMove = !r.orderNumber && (r.type === 'scissor' || r.movementType === 'scissor' || r.isScissor === true || !!r.toBranch);
+
+                                        if (isMyDirectTask && (isCustomerOrder || isScissorMove) && !isCancelled) {
+                                            const isPendingStatus = (r.status === 'preparing' || r.status === 'out_for_delivery' || r.status === 'pending' || r.status === 'waiting_branch');
+                                            const isAlreadyDone = (r.delegateConfirmed === true || r.branchConfirmed === true || r.status === 'confirmed' || r.status === 'completed' || r.status === 'delivered');
+
+                                            if (isPendingStatus && !isAlreadyDone) {
+                                                fetchedOrders.push({
+                                                    id: k,
+                                                    date: dateStr,
+                                                    parentBranchId: branchKey,
+                                                    recordKind: isCustomerOrder ? 'order' : 'scissor',
+                                                    ...r
+                                                });
+            
+                                                pendingCount++;
+                                                
+                                                if (isCustomerOrder) {
+                                                    const payMethod = (r.paymentMethod || 'نقدي').trim();
+                                                    if(payMethod === 'نقدي') {
+                                                        const orderCash = exactAdd(r.orderValue, r.changeAmount);
+                                                        totalCashCollected = exactAdd(totalCashCollected, orderCash);
+                                                    }
+                                                }
+
+                                                if (!knownOrderIds.has(k)) {
+                                                    knownOrderIds.add(k);
+                                                    if (!isFirstLoad) {
+                                                        hasNewOrder = true;
+                                                        const notifLabel = isCustomerOrder ? `أوردر رقم #${r.orderNumber}` : `حركة مقصة جديدة`;
+                                                        sendPushNotification("تكليف جديد!", `تم إضافة ${notifLabel}`);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    });
+                                }
+                            });
+                        }
+                    });
+
+                    if (hasNewOrder) {
+                        const audio = document.getElementById('newOrderSound');
+                        if (audio) audio.play().catch(() => {});
+                        if(navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                        showToast("تم إضافة تكليف جديد لمهامك!", "success");
+                    }
+                    isFirstLoad = false; 
+
+                    fetchedOrders.sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0));
+                    
+                    myOrders = fetchedOrders;
+                    renderOrders();
+
+                    document.getElementById('statPendingCount').textContent = pendingCount;
+                    document.getElementById('statTotalTodayOrders').textContent = totalTodayOrders;
+                    document.getElementById('statTotalCash').textContent = roundMoney(totalCashCollected);
+
+                } catch (e) {
+                } finally {
+                    loading.classList.add('hidden');
+                    isFetchingOrders = false;
+                }
+            };
+
+            function renderOrders() {
+                const list = document.getElementById('ordersList');
+                const noMsg = document.getElementById('noOrdersMsg');
+                
+                if (myOrders.length === 0) {
+                    list.innerHTML = '';
+                    noMsg.classList.remove('hidden');
+                } else {
+                    noMsg.classList.add('hidden');
+                    const htmlBuffer = [];
+                    
+                    myOrders.forEach(order => {
+                        // ================= CARD TYPE A: SCISSOR MOVEMENT =================
+                        if (order.recordKind === 'scissor') {
+                            const fromName = escapeHTML(order.fromBranchName || (branchesCache[order.fromBranch]?.name) || (branchesCache[order.parentBranchId]?.name) || 'الفرع الحالي');
+                            const toName = escapeHTML(order.toBranchName || (branchesCache[order.toBranch]?.name) || order.toBranch || 'فرع آخر');
+
+                            htmlBuffer.push(`
+                                <div class="bg-white border-2 border-amber-200 rounded-[2rem] p-5 sm:p-6 shadow-soft relative overflow-hidden flex flex-col justify-between">
+                                    <div class="absolute right-0 top-0 w-2 h-full bg-amber-500"></div>
+                                    <div>
+                                        <div class="flex justify-between items-start gap-2 mb-4 pb-3 border-b border-slate-100">
+                                            <div class="flex flex-col gap-1.5">
+                                                <div class="bg-amber-100 text-amber-800 text-[10px] font-black px-3 py-1 rounded-full flex items-center gap-1.5 w-max">
+                                                    <i class="fa-solid fa-clock-rotate-left animate-spin" style="animation-duration: 6s;"></i>
+                                                    <span>معلقة - بانتظار تأكيد الفرع</span>
+                                                </div>
+                                                <div class="text-lg sm:text-xl font-black text-primary leading-snug">حركة مقصة بين الفروع</div>
+                                            </div>
+                                            <div class="w-11 h-11 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center shrink-0">
+                                                <i class="fa-solid fa-code-branch text-lg"></i>
+                                            </div>
+                                        </div>
+
+                                        <div class="bg-amber-50/50 border border-amber-100 rounded-2xl p-3.5 mb-3 flex items-center justify-between gap-2">
+                                            <div class="text-center flex-1 min-w-0">
+                                                <span class="text-[10px] font-bold text-slate-400 block">من فرع</span>
+                                                <span class="text-xs sm:text-sm font-black text-slate-800 truncate block">${fromName}</span>
+                                            </div>
+                                            <div class="w-8 h-8 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                                                <i class="fa-solid fa-arrow-left-long text-sm"></i>
+                                            </div>
+                                            <div class="text-center flex-1 min-w-0">
+                                                <span class="text-[10px] font-bold text-slate-400 block">إلى فرع</span>
+                                                <span class="text-xs sm:text-sm font-black text-amber-800 truncate block">${toName}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-slate-500">
+                                        <span>حركة مقصة</span>
+                                        <span class="text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-100">قيد تأكيد الفرع</span>
+                                    </div>
+                                </div>
+                            `);
+                            return;
+                        }
+
+                        // ================= CARD TYPE B: CUSTOMER DELIVERY ORDER =================
+                        const totalValue = exactAdd(order.orderValue, order.changeAmount);
+                        const paymentMethod = escapeHTML(order.paymentMethod || 'نقدي');
+                        const currentStatus = order.status === 'pending' ? 'preparing' : order.status;
+                        const receiptQty = Number(order.receiptCount) || Number(order.quantity) || 1;
+                        
+                        const isOut = currentStatus === 'out_for_delivery';
+                        const cardClass = isOut ? 'bg-white border-2 border-accent shadow-glow-green' : 'bg-white border border-slate-100 shadow-soft';
+                        const badgeHtml = isOut
+                            ? `<div class="bg-emerald-100 text-emerald-700 text-[10px] font-black px-3 py-1 rounded-full flex items-center gap-1.5 w-max"><div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div> جاري التوصيل</div>`
+                            : `<div class="bg-blue-100 text-blue-700 text-[10px] font-black px-3 py-1 rounded-full w-max">قيد الانتظار بالفرع</div>`;
+
+                        const safeDate = escapeHTML(order.date);
+                        const safeBranch = escapeHTML(order.parentBranchId);
+                        const safeId = escapeHTML(order.id);
+
+                        let actionBtn = '';
+                        if (!isOut) {
+                            actionBtn = `<button onclick="updateToOutForDelivery('${safeDate}', '${safeBranch}', '${safeId}')" class="w-full bg-slate-50 text-secondary py-3.5 sm:py-4 rounded-2xl font-black text-base sm:text-lg hover:bg-blue-50 active:scale-95 transition-all mt-4 border-2 border-secondary/30 border-dashed"><i class="fa-solid fa-motorcycle ml-2"></i> تأكيد استلام الأوردر والخروج</button>`;
+                        } else {
+                            actionBtn = `<button onclick="openDeliveryModal('${safeDate}', '${safeBranch}', '${safeId}')" class="w-full bg-primary text-white py-4 rounded-2xl font-black text-lg sm:text-xl shadow-[0_8px_20px_rgba(15,23,42,0.3)] hover:shadow-[0_8px_25px_rgba(15,23,42,0.4)] active:scale-95 transition-all mt-4 new-order-pulse"><i class="fa-solid fa-check-double ml-2"></i> تسليم الأوردر للعميل</button>`;
+                        }
+
+                        let payIcon = 'fa-money-bill-wave';
+                        let payColor = 'text-emerald-700 bg-emerald-50 border-emerald-100';
+                        if(order.paymentMethod === 'انستاباي') { payIcon = 'fa-bolt'; payColor = 'text-purple-700 bg-purple-50 border-purple-100'; }
+                        else if(order.paymentMethod === 'فيزا') { payIcon = 'fa-credit-card'; payColor = 'text-blue-700 bg-blue-50 border-blue-100'; }
+                        else if(order.paymentMethod === 'محفظة') { payIcon = 'fa-wallet'; payColor = 'text-orange-700 bg-orange-50 border-orange-100'; }
+
+                        const regionText = escapeHTML(order.subRegionName || order.customerRegion || order.region || order.area || '');
+                        const regionBadge = regionText ? `<div class="bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-black px-2.5 py-1 rounded-lg inline-flex items-center gap-1.5 mb-1.5"><i class="fa-solid fa-map-pin"></i> ${regionText}</div>` : '';
+                        const receiptCountBadge = `<span class="bg-slate-100 text-slate-700 text-[10px] font-black px-2 py-0.5 rounded-md border border-slate-200 mr-1.5">عدد الريسيت: ${receiptQty}</span>`;
+
+                        const safeAddress = escapeHTML(order.customerAddress);
+                        const addressHtml = order.customerAddress && order.customerAddress.trim() !== '' ? 
+                            `<div class="bg-slate-50 border border-slate-100 rounded-2xl p-3.5 mb-3.5 flex items-start gap-3">
+                                <div class="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center text-red-500 shrink-0"><i class="fa-solid fa-map-location-dot text-base"></i></div>
+                                <div class="flex-grow min-w-0">
+                                    <span class="text-[10px] font-black text-slate-400 block mb-1 uppercase tracking-wide">بيانات وعنوان التوصيل</span>
+                                    ${regionBadge}
+                                    <span class="text-xs sm:text-sm font-black text-slate-700 leading-snug block break-words">${safeAddress}</span>
+                                </div>
+                            </div>` : 
+                            `<div class="bg-slate-50 border border-slate-100 rounded-2xl p-3.5 mb-3.5 flex items-start gap-3">
+                                <div class="w-9 h-9 rounded-xl bg-slate-200 flex items-center justify-center text-slate-400 shrink-0"><i class="fa-solid fa-location-question text-base"></i></div>
+                                <div class="flex-grow min-w-0">
+                                    <span class="text-[10px] font-black text-slate-400 block mb-1 uppercase tracking-wide">بيانات وعنوان التوصيل</span>
+                                    ${regionBadge}
+                                    <span class="text-xs font-bold text-slate-500 italic">العميل لم يحدد العنوان بوضوح</span>
+                                </div>
+                            </div>`;
+
+                        const rawWa = order.customerWhatsapp ? order.customerWhatsapp.trim() : '';
+                        const rawPhone = order.customerPhone ? order.customerPhone.trim() : '';
+                        const finalWa = rawWa || rawPhone;
+                        const finalPhone = rawPhone || rawWa;
+
+                        let contactActionsHtml = '';
+                        if (finalPhone || finalWa) {
+                            const phoneLink = finalPhone ? finalPhone.replace(/\D/g, '') : '';
+                            const waLink = finalWa ? (finalWa.replace(/\D/g, '').startsWith('01') ? '2' + finalWa.replace(/\D/g, '') : finalWa.replace(/\D/g, '')) : '';
+
+                            contactActionsHtml = `
+                                <a href="tel:${phoneLink}" class="bg-white text-secondary border border-slate-200 rounded-2xl p-2.5 flex flex-col justify-center items-center text-center active:bg-blue-50 hover:shadow-md transition-all">
+                                    <i class="fa-solid fa-phone text-lg mb-1"></i><span class="font-black text-[11px]">اتصال</span>
+                                </a>
+                                <a href="https://wa.me/${waLink}" target="_blank" rel="noopener noreferrer" class="bg-white text-accent border border-slate-200 rounded-2xl p-2.5 flex flex-col justify-center items-center text-center active:bg-emerald-50 hover:shadow-md transition-all">
+                                    <i class="fa-brands fa-whatsapp text-xl mb-1"></i><span class="font-black text-[11px]">واتساب</span>
+                                </a>`;
+                        } else {
+                            contactActionsHtml = `<div class="col-span-2 bg-slate-50 text-slate-400 border border-slate-200 rounded-2xl p-2.5 flex justify-center items-center gap-2 text-xs font-bold"><i class="fa-solid fa-phone-slash"></i><span>لا يوجد أرقام تواصل</span></div>`;
+                        }
+
+                        htmlBuffer.push(`
+                            <div class="${cardClass} rounded-[2rem] p-5 sm:p-6 transition-all duration-300 relative overflow-hidden flex flex-col justify-between">
+                                ${isOut ? '<div class="absolute right-0 top-0 w-2 h-full bg-accent"></div>' : ''}
+                                <div>
+                                    <div class="flex justify-between items-start gap-2 mb-4 pb-3.5 border-b border-slate-100">
+                                        <div class="flex flex-col gap-1.5">
+                                            <div class="flex items-center flex-wrap gap-1">
+                                                ${badgeHtml}
+                                                ${receiptCountBadge}
+                                            </div>
+                                            <div>
+                                                <span class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-0.5">رقم الأوردر</span>
+                                                <div class="text-2xl sm:text-3xl font-black text-primary tracking-widest leading-none">#${escapeHTML(order.orderNumber)}</div>
+                                            </div>
+                                        </div>
+                                        <div class="text-left bg-gradient-to-br from-slate-800 to-primary px-3.5 py-2.5 rounded-[1.2rem] shadow-md border border-slate-700 shrink-0">
+                                            <span class="text-[9px] font-black text-slate-300 block mb-0.5 uppercase tracking-wider">المطلوب تحصيله</span>
+                                            <div class="text-xl sm:text-2xl font-black text-white">${totalValue > 0 ? totalValue : '---'} <span class="text-xs font-bold text-slate-400">ج.م</span></div>
+                                        </div>
+                                    </div>
+
+                                    ${addressHtml}
+
+                                    <div class="grid grid-cols-3 gap-2.5 mb-3">
+                                        <div class="${payColor} border rounded-2xl p-2.5 flex flex-col justify-center items-center text-center">
+                                            <i class="fa-solid ${payIcon} text-xl mb-1 opacity-80"></i>
+                                            <span class="font-black text-[11px] truncate w-full">${paymentMethod}</span>
+                                        </div>
+                                        ${contactActionsHtml}
+                                    </div>
+
+                                    ${Number(order.changeAmount) > 0 ? `
+                                        <div class="bg-amber-50 border border-amber-200 text-amber-800 p-3.5 rounded-2xl text-xs sm:text-sm font-black mb-2 flex items-center shadow-sm">
+                                            <div class="w-9 h-9 bg-amber-100 rounded-xl flex items-center justify-center ml-3 shrink-0 text-amber-600"><i class="fa-solid fa-coins text-xl"></i></div>
+                                            <div>تنبيه! العميل يحتاج فكة:<br><span class="text-lg">${Number(order.changeAmount)} ج.م</span></div>
+                                        </div>` : ''}
+                                </div>
+                                
+                                ${actionBtn}
+                            </div>`);
+                    });
+
+                    list.innerHTML = htmlBuffer.join('');
+                }
+            }
+
+            window.updateToOutForDelivery = async function(date, parentBranchId, id) {
+                try {
+                    await secureFetch(`daily_records/${date}/${parentBranchId}/${id}.json`, {
+                        method: 'PATCH',
+                        body: JSON.stringify({ status: 'out_for_delivery', outTimestamp: Date.now() })
+                    });
+                    showToast("تم تغيير الحالة: جاري التوصيل 🏍️", "success");
+                    fetchMyOrders(true);
+                } catch (e) { showToast("فشل تحديث الحالة، تأكد من الإنترنت", "error"); }
+            };
+
+            // ==================== DELIVERY MODAL & GPS ====================
+            window.openDeliveryModal = function(date, parentBranchId, id) {
+                const order = myOrders.find(o => o.id === id && o.date === date && o.parentBranchId === parentBranchId);
+                if(!order) return;
+
+                orderToConfirm = order;
+                document.getElementById('confirmOrderNum').textContent = `#${order.orderNumber}`;
+
+                const totalVal = exactAdd(order.orderValue, order.changeAmount);
+                const payMethod = order.paymentMethod || 'نقدي';
+                const payArea = document.getElementById('paymentArea');
+
+                if (payMethod === 'نقدي') {
+                    payArea.innerHTML = `
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 p-5 rounded-3xl text-emerald-800 shadow-inner">
+                            <span class="text-xs font-black text-emerald-600/80 block mb-1 uppercase tracking-wider">يجب استلام نقدي من العميل</span>
+                            <div class="text-4xl font-black text-emerald-700">${totalVal > 0 ? totalVal : '0'} <span class="text-base font-bold text-emerald-600">ج.م</span></div>
+                        </div>`;
+                } else {
+                    payArea.innerHTML = `
+                        <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 p-5 rounded-3xl text-blue-900 shadow-inner">
+                            <div class="inline-flex items-center gap-2 bg-white px-3 py-1 rounded-full border border-blue-100 mb-2 shadow-sm">
+                                <span class="text-xs font-black text-secondary">${escapeHTML(payMethod)}</span>
+                            </div>
+                            <span class="text-xs font-bold block mb-1 text-slate-500">لا يوجد نقدية مطلوبة (مدفوع مسبقاً/إلكتروني)</span>
+                            <div class="text-xl font-black text-primary mt-1">قيمة الأوردر: ${totalVal} ج.م</div>
+                        </div>`;
+                }
+
+                document.getElementById('deliveryConfirmModal').classList.add('active');
+            };
+
+            window.closeDeliveryModal = function() {
+                document.getElementById('deliveryConfirmModal').classList.remove('active');
+                orderToConfirm = null;
+            };
+
+            function getGPSLocation() {
+                return new Promise((resolve) => {
+                    if (!navigator.geolocation) {
+                        resolve(null);
+                        return;
+                    }
+                    navigator.geolocation.getCurrentPosition(
+                        pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }),
+                        () => resolve(null),
+                        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+                    );
+                });
+            }
+
+            window.executeDelivery = async function() {
+                if(!orderToConfirm) return;
+                const btn = document.getElementById('btnConfirmDelivery');
+                const origHtml = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-location-crosshairs fa-spin text-xl"></i> جاري تأكيد الموقع والتوصيل...';
+
+                try {
+                    const gpsCoords = await getGPSLocation();
+                    const { date, parentBranchId, id, orderNumber } = orderToConfirm;
+
+                    await secureFetch(`daily_records/${date}/${parentBranchId}/${id}.json`, {
+                        method: 'PATCH',
+                        body: JSON.stringify({
+                            delegateConfirmed: true,
+                            deliveryTimestamp: Date.now(),
+                            deliveryLocation: gpsCoords || 'Not available',
+                            status: 'delivered'
+                        })
+                    });
+
+                    showToast(`تم تسجيل توصيل الأوردر #${orderNumber} بنجاح!`, "success");
+                    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                    closeDeliveryModal();
+                    fetchMyOrders(true);
+                } catch (e) {
+                    showToast("حدث خطأ أثناء تأكيد التوصيل، تأكد من الإنترنت", "error");
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = origHtml;
+                }
+            };
+
+            // ==================== REPORTS & SETTLEMENTS ====================
+            window.generateReport = async function() {
+                const fromVal = document.getElementById('repFromDate').value;
+                const toVal = document.getElementById('repToDate').value;
+                const branchFilter = document.getElementById('repBranchFilter').value;
+
+                if(!fromVal || !toVal) {
+                    showToast("يرجى تحديد الفترة الزمنية", "warning");
+                    return;
+                }
+
+                const fromTs = new Date(fromVal).getTime();
+                const toTs = new Date(toVal).getTime();
+
+                document.getElementById('reportStats').classList.add('hidden');
+                document.getElementById('reportEmpty').classList.add('hidden');
+                document.getElementById('reportResults').innerHTML = '';
+                document.getElementById('reportLoading').classList.remove('hidden');
+                document.getElementById('reportLoading').classList.add('flex');
+
+                const dates = [];
+                let curr = new Date(fromVal.split('T')[0]);
+                const end = new Date(toVal.split('T')[0]);
+                while (curr <= end) {
+                    const y = curr.getFullYear();
+                    const m = String(curr.getMonth() + 1).padStart(2, '0');
+                    const d = String(curr.getDate()).padStart(2, '0');
+                    dates.push(`${y}-${m}-${d}`);
+                    curr.setDate(curr.getDate() + 1);
+                }
+
+                let totalMoney = 0;
+                let totalMovements = 0;
+                const cardsHtml = [];
+
+                try {
+                    const results = await Promise.all(dates.map(d => secureFetch(`daily_records/${d}.json`, {}, 0)));
+                    results.forEach((dayData, idx) => {
+                        if (!dayData) return;
+                        const dateStr = dates[idx];
+
+                        Object.keys(dayData).forEach(branchKey => {
+                            const branchRecords = dayData[branchKey];
+                            if (!branchRecords || typeof branchRecords !== 'object') return;
+
+                            Object.keys(branchRecords).forEach(recKey => {
+                                const r = branchRecords[recKey];
+                                if (!r || typeof r !== 'object') return;
+                                if (String(r.delegateId) !== String(currentDelegate.id)) return;
+
+                                const isCancelled = r.status && String(r.status).toLowerCase().includes('cancel');
+                                if (isCancelled) return;
+
+                                const ts = r.deliveryTimestamp || r.timestamp || 0;
+                                if (ts < fromTs || ts > toTs) return;
+
+                                if (branchFilter !== 'all' && branchKey !== branchFilter && r.toBranch !== branchFilter) return;
+
+                                const qty = Number(r.receiptCount) || Number(r.quantity) || Number(r.count) || 1;
+                                let unitEarn = 0;
+                                let title = '';
+                                let badge = '';
+
+                                if (r.orderNumber) {
+                                    unitEarn = roundMoney(r.deliveryFee ?? r.regionPrice ?? 0);
+                                    title = `أوردر #${escapeHTML(r.orderNumber)} (${escapeHTML(r.subRegionName || r.customerRegion || 'توصيل')})`;
+                                    badge = r.status === 'delivered' ? '<span class="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-black">تم التسليم</span>' : '<span class="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-black">معلق</span>';
+                                } else {
+                                    unitEarn = roundMoney(r.movementPrice ?? r.settlementPrice ?? r.delegatePrice ?? 0);
+                                    const targetName = r.toBranchName || (branchesCache[r.toBranch]?.name) || r.branchName || 'فرع';
+                                    title = `مقصة إلى: ${escapeHTML(targetName)}`;
+                                    badge = (r.status === 'completed' || r.branchConfirmed) ? '<span class="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-black">معتمدة</span>' : '<span class="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-black">قيد التأكيد</span>';
+                                }
+
+                                const rowMoney = exactMul(unitEarn, qty);
+                                totalMoney = exactAdd(totalMoney, rowMoney);
+                                totalMovements += qty;
+
+                                cardsHtml.push(`
+                                    <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-soft flex justify-between items-center">
+                                        <div>
+                                            <div class="flex items-center gap-2 mb-1">
+                                                ${badge}
+                                                <span class="text-[10px] text-slate-400 font-bold">${dateStr}</span>
+                                            </div>
+                                            <div class="font-black text-primary text-sm">${title}</div>
+                                            <div class="text-xs text-slate-500 font-bold mt-0.5">${r.orderNumber ? `عدد الريسيت: ${qty}` : 'حركة مقصة'}</div>
+                                        </div>
+                                        <div class="text-left bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-100">
+                                            <span class="text-[9px] text-emerald-600 font-black block">المستحق</span>
+                                            <span class="text-lg font-black text-emerald-700">${rowMoney} <span class="text-xs">ج.م</span></span>
+                                        </div>
+                                    </div>
+                                `);
+                            });
+                        });
+                    });
+
+                    document.getElementById('repTotalSettlementMoney').textContent = totalMoney.toFixed(2);
+                    document.getElementById('repTotalMovementsCount').textContent = totalMovements;
+
+                    if (cardsHtml.length === 0) {
+                        document.getElementById('reportEmpty').classList.remove('hidden');
+                        document.getElementById('reportEmpty').classList.add('flex');
+                    } else {
+                        document.getElementById('reportStats').classList.remove('hidden');
+                        document.getElementById('reportStats').classList.add('grid');
+                        document.getElementById('reportResults').innerHTML = cardsHtml.join('');
+                    }
+                } catch (e) {
+                    showToast("حدث خطأ أثناء جلب التقرير", "error");
+                } finally {
+                    document.getElementById('reportLoading').classList.add('hidden');
+                    document.getElementById('reportLoading').classList.remove('flex');
+                }
+            };
+
+            // ==================== SETTINGS: CHANGE PASSWORD ====================
+            window.handlePasswordChange = async function(e) {
+                e.preventDefault();
+                const oldPass = document.getElementById('oldPass').value.trim();
+                const newPass = document.getElementById('newPass').value.trim();
+                const confirmNewPass = document.getElementById('confirmNewPass').value.trim();
+
+                if (newPass !== confirmNewPass) {
+                    showToast("كلمتا المرور الجديدتان غير متطابقتين", "error");
+                    return;
+                }
+
+                const btn = document.getElementById('btnChangePass');
+                const origHtml = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري الحفظ...';
+
+                try {
+                    const delData = await secureFetch(`delegates/${currentDelegate.id}.json`, {}, 0);
+                    if (!delData || String(delData.password) !== String(oldPass)) {
+                        showToast("كلمة المرور الحالية غير صحيحة", "error");
+                        return;
+                    }
+
+                    await secureFetch(`delegates/${currentDelegate.id}.json`, {
+                        method: 'PATCH',
+                        body: JSON.stringify({ password: newPass })
+                    });
+
+                    showToast("تم تغيير كلمة المرور بنجاح!", "success");
+                    document.getElementById('changePasswordForm').reset();
+                } catch (err) {
+                    showToast("حدث خطأ أثناء تغيير كلمة المرور", "error");
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = origHtml;
+                }
+            };
+        })();
+    </script>
+</body>
+</html>
